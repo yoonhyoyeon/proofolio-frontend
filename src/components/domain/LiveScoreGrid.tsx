@@ -7,10 +7,18 @@ const colorMap: Record<string, string> = {
   emerald: 'bg-emerald-500',
 }
 
-export function LiveScoreGrid() {
+export type LiveScoreItem = {
+  label: string
+  value: number
+  color: string
+}
+
+export function LiveScoreGrid({ scores }: { scores?: LiveScoreItem[] }) {
+  const items = scores ?? liveScores
+
   return (
     <div className="grid grid-cols-2 gap-2">
-      {liveScores.map((s) => (
+      {items.map((s) => (
         <div
           key={s.label}
           className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-white p-3"
@@ -28,7 +36,7 @@ export function LiveScoreGrid() {
           </div>
           <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-slate-100">
             <div
-              className={`h-full rounded-full ${colorMap[s.color] ?? 'bg-indigo-500'}`}
+              className={`h-full rounded-full transition-[width] duration-500 ${colorMap[s.color] ?? 'bg-indigo-500'}`}
               style={{ width: `${s.value}%` }}
             />
           </div>

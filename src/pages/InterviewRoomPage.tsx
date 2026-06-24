@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
-  Eye,
   Mic,
   MicOff,
+  PersonStanding,
   PhoneOff,
   ScanFace,
   Sparkles,
+  VideoOff,
   Wifi,
   WifiOff,
 } from 'lucide-react'
@@ -14,8 +15,13 @@ import { cn } from '@/lib/cn'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Avatar } from '@/components/ui/avatar'
+import {
+  PoseMeshOverlay,
+  type OverlayLayers,
+  type LiveMetrics,
+} from '@/components/domain/PoseMeshOverlay'
 import { RealtimeFeedbackPanel } from '@/components/domain/RealtimeFeedbackPanel'
-import { LiveScoreGrid } from '@/components/domain/LiveScoreGrid'
+import { LiveScoreGrid, type LiveScoreItem } from '@/components/domain/LiveScoreGrid'
 import { interviewers, interviewMeta, currentUser } from '@/lib/mock'
 import { useInterviewAudio, type ConnectionStatus } from '@/hooks/useInterviewAudio'
 
@@ -37,6 +43,17 @@ export function InterviewRoomPage() {
   const elapsedLabel = `${String(Math.floor(elapsed / 60)).padStart(2, '0')}:${String(elapsed % 60).padStart(2, '0')}`
 
   const { status, micOn, toggleMic, transcriptText } = useInterviewAudio()
+
+  // Live vision metrics from the MediaPipe overlay
+  const [metrics, setMetrics] = useState<LiveMetrics | null>(null)
+  const liveScores: LiveScoreItem[] | undefined = metrics
+    ? [
+        { label: '정면 응시', value: Math.round(metrics.gaze), color: 'indigo' },
+        { label: '자세 안정성', value: Math.round(metrics.posture), color: 'sky' },
+        { label: '움직임 안정', value: Math.round(metrics.stability), color: 'violet' },
+        { label: '종합 자신감', value: Math.round(metrics.confidence), color: 'emerald' },
+      ]
+    : undefined
 
   return (
     <div className="flex h-screen w-full flex-col bg-[#0b0f19] text-slate-100">
@@ -72,6 +89,7 @@ export function InterviewRoomPage() {
               isReal={isReal}
               micOn={micOn}
               onToggleMic={toggleMic}
+              onMetrics={setMetrics}
             />
           </section>
 
@@ -91,8 +109,8 @@ export function InterviewRoomPage() {
             <SidePanelSection title="실시간 피드백" badge="4 new">
               <RealtimeFeedbackPanel />
             </SidePanelSection>
-            <SidePanelSection title="실시간 점수">
-              <LiveScoreGrid />
+            <SidePanelSection title="실시간 점수" badge={metrics ? 'LIVE' : undefined}>
+              <LiveScoreGrid scores={liveScores} />
             </SidePanelSection>
           </aside>
         )}
@@ -229,13 +247,49 @@ function MyVideoTile({
   isReal,
   micOn,
   onToggleMic,
+  onMetrics,
 }: {
   name: string
   initials: string
   isReal: boolean
   micOn: boolean
   onToggleMic: () => void
+  onMetrics?: (metrics: LiveMetrics) => void
 }) {
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const [camReady, setCamReady] = useState(false)
+  const [camError, setCamError] = useState(false)
+  const [layers, setLayers] = useState<OverlayLayers>({ mesh: true, skeleton: true })
+  const [overlayStatus, setOverlayStatus] =
+    useState<'loading' | 'ready' | 'error'>('loading')
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true })
+        if (cancelled) {
+          stream.getTracks().forEach(t => t.stop())
+          return
+        }
+        streamRef.current = stream
+        if (videoRef.current) videoRef.current.srcObject = stream
+        setCamReady(true)
+      } catch {
+        if (!cancelled) setCamError(true)
+      }
+    })()
+    return () => {
+      cancelled = true
+      streamRef.current?.getTracks().forEach(t => t.stop())
+    }
+  }, [])
+
+  // Real-time vision analysis is a practice-mode-only feature
+  const analysisOn = !isReal
+  const overlayActive = analysisOn && (layers.mesh || layers.skeleton)
+
   return (
     <div className="relative h-full w-full overflow-hidden rounded-[var(--radius-xl)] border border-white/10 bg-slate-950 shadow-[0_12px_40px_rgba(0,0,0,0.45)]">
       <div
@@ -246,52 +300,94 @@ function MyVideoTile({
             'radial-gradient(280px 200px at 50% 45%, rgba(99,102,241,0.30), transparent 65%), linear-gradient(180deg, #0b1220 0%, #1e293b 100%)',
         }}
       />
-      <div className="relative flex h-full w-full items-center justify-center">
-        <Avatar initials={initials} size="xl" accent="from-indigo-500 to-violet-500" />
-      </div>
 
-      {/* Practice-mode overlays */}
-      {!isReal && (
-        <>
-          <div
-            aria-hidden
-            className="absolute left-[42%] top-[24%] h-[40%] w-[16%] rounded-[18%/22%] border-2 border-emerald-400/85"
-            style={{ boxShadow: '0 0 0 3px rgba(16,185,129,0.18)' }}
-          >
-            <span className="absolute -left-1.5 -top-1.5 h-2.5 w-2.5 rounded-full bg-emerald-400" />
-            <span className="absolute -right-1.5 -top-1.5 h-2.5 w-2.5 rounded-full bg-emerald-400" />
-            <span className="absolute -bottom-1.5 -left-1.5 h-2.5 w-2.5 rounded-full bg-emerald-400" />
-            <span className="absolute -bottom-1.5 -right-1.5 h-2.5 w-2.5 rounded-full bg-emerald-400" />
-            <span className="absolute -top-6 left-0 inline-flex items-center gap-1 rounded-md bg-emerald-500/90 px-1.5 py-0.5 text-[10px] font-bold text-white">
-              <ScanFace className="h-3 w-3" />
-              얼굴 인식
-            </span>
-          </div>
-          <svg
-            aria-hidden
-            className="absolute inset-0 h-full w-full opacity-75"
-            viewBox="0 0 200 120"
-            fill="none"
-            preserveAspectRatio="none"
-          >
-            <circle cx="100" cy="38" r="2.6" fill="#60A5FA" />
-            <circle cx="78" cy="66" r="2.2" fill="#60A5FA" />
-            <circle cx="122" cy="66" r="2.2" fill="#60A5FA" />
-            <circle cx="66" cy="96" r="2.2" fill="#60A5FA" />
-            <circle cx="134" cy="96" r="2.2" fill="#60A5FA" />
-            <path
-              d="M100 38 L78 66 L66 96 M100 38 L122 66 L134 96 M78 66 L122 66"
-              stroke="#60A5FA"
-              strokeWidth="0.9"
-              strokeDasharray="2 2"
-              opacity="0.85"
+      {/* Live camera feed */}
+      <video
+        ref={videoRef}
+        autoPlay
+        muted
+        playsInline
+        className={cn(
+          'absolute inset-0 h-full w-full object-cover',
+          !camReady && 'invisible',
+        )}
+      />
+
+      {/* Camera unavailable → fallback avatar */}
+      {!camReady && (
+        <div className="relative flex h-full w-full flex-col items-center justify-center gap-3">
+          {camError ? (
+            <>
+              <VideoOff className="h-10 w-10 text-slate-500" />
+              <p className="text-sm font-medium text-slate-400">
+                카메라를 사용할 수 없습니다
+              </p>
+            </>
+          ) : (
+            <Avatar initials={initials} size="xl" accent="from-indigo-500 to-violet-500" />
+          )}
+        </div>
+      )}
+
+      {/* MediaPipe face mesh + pose skeleton overlay — practice mode only */}
+      {camReady && analysisOn && (
+        <PoseMeshOverlay
+          videoRef={videoRef}
+          active={overlayActive}
+          layers={layers}
+          onStatusChange={setOverlayStatus}
+          onMetrics={onMetrics}
+        />
+      )}
+
+      {/* Layer toggles + AI status — practice mode only */}
+      {camReady && analysisOn && (
+        <div className="absolute left-3 top-3 flex flex-col gap-2">
+          <div className="flex items-center gap-1.5">
+            <LayerChip
+              active={layers.mesh}
+              onClick={() => setLayers(l => ({ ...l, mesh: !l.mesh }))}
+              icon={<ScanFace className="h-3 w-3" />}
+              label="얼굴 메쉬"
             />
-          </svg>
-          <div className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-1 text-[11px] font-semibold text-white backdrop-blur">
-            <Eye className="h-3 w-3 text-emerald-400" />
-            시선 OK
+            <LayerChip
+              active={layers.skeleton}
+              onClick={() => setLayers(l => ({ ...l, skeleton: !l.skeleton }))}
+              icon={<PersonStanding className="h-3 w-3" />}
+              label="스켈레톤"
+            />
           </div>
-        </>
+          <span
+            className={cn(
+              'inline-flex w-fit items-center gap-1 rounded-full bg-black/60 px-2 py-1 text-[10px] font-semibold backdrop-blur',
+              overlayStatus === 'ready' && 'text-emerald-300',
+              overlayStatus === 'loading' && 'text-slate-300',
+              overlayStatus === 'error' && 'text-rose-300',
+            )}
+          >
+            {overlayStatus === 'ready' && (
+              <>
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+                AI 분석 중
+              </>
+            )}
+            {overlayStatus === 'loading' && (
+              <>
+                <span className="h-3 w-3 animate-spin rounded-full border-2 border-slate-600 border-t-slate-300" />
+                모델 로딩 중...
+              </>
+            )}
+            {overlayStatus === 'error' && '모델 로드 실패'}
+          </span>
+        </div>
+      )}
+
+      {/* Practice-mode label (real mesh replaces the old fake overlay) */}
+      {!isReal && camReady && (
+        <div className="absolute left-3 bottom-14 inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-1 text-[11px] font-semibold text-indigo-200 backdrop-blur">
+          <Sparkles className="h-3 w-3 text-indigo-300" />
+          자세·표정 실시간 분석
+        </div>
       )}
 
       <div className="absolute right-3 top-3 rounded-full bg-black/55 px-2 py-1 font-mono text-[10px] text-slate-200">
@@ -320,6 +416,35 @@ function MyVideoTile({
         </button>
       </div>
     </div>
+  )
+}
+
+function LayerChip({
+  active,
+  onClick,
+  icon,
+  label,
+}: {
+  active: boolean
+  onClick: () => void
+  icon: React.ReactNode
+  label: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        'inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-semibold backdrop-blur transition-colors',
+        active
+          ? 'border-indigo-400/50 bg-indigo-500/25 text-indigo-100 hover:bg-indigo-500/35'
+          : 'border-white/15 bg-black/55 text-slate-400 hover:bg-black/70',
+      )}
+    >
+      {icon}
+      {label}
+    </button>
   )
 }
 
