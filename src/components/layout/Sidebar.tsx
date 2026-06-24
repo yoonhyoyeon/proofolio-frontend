@@ -3,6 +3,7 @@ import {
   LayoutDashboard,
   Mic,
   FileText,
+  FolderKanban,
   Settings,
   Sparkles,
 } from 'lucide-react'
@@ -21,6 +22,7 @@ const nav: NavItem[] = [
   { to: '/', label: '대시보드', icon: LayoutDashboard, end: true },
   { to: '/interview/new', label: '면접 연습', icon: Mic },
   { to: '/reports', label: '면접 리포트', icon: FileText },
+  { to: '/portfolio', label: '내 포트폴리오', icon: FolderKanban },
   { to: '/settings', label: '설정', icon: Settings },
 ]
 

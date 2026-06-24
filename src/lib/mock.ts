@@ -11,7 +11,24 @@ export const currentUser = {
   email: 'loveyhy2002@gmail.com',
   initials: '윤효',
   role: '프론트엔드 개발자',
+  phone: '010-1234-5678',
 }
+
+export const githubProfile = {
+  username: 'yoonhyoyeon',
+  bio: '사용자 경험과 코드 품질을 모두 챙기는 프론트엔드 개발자. React/TS/Tailwind, 디자인 시스템에 관심이 많습니다.',
+}
+
+export const githubExtractedSkills: Record<string, string[]> = {
+  Frontend: ['React', 'TypeScript', 'Next.js', 'TailwindCSS', 'Vite'],
+  Backend: ['Node.js', 'Python'],
+  Tooling: ['Figma', 'Storybook'],
+}
+
+export const githubOssContributions = [
+  { id: 'oss1', repo: 'facebook/react', title: 'docs: fix useEffect example' },
+  { id: 'oss2', repo: 'vercel/next.js', title: 'fix(image): correct srcset for fill prop' },
+]
 
 export const dashboardStats = [
   {
@@ -56,7 +73,6 @@ export const recentInterviews = [
   {
     id: 'iv-104',
     title: '프론트엔드 개발자 모의면접',
-    company: '토스',
     position: '프론트엔드',
     date: '2026.06.20',
     score: 84,
@@ -65,7 +81,6 @@ export const recentInterviews = [
   {
     id: 'iv-103',
     title: '백엔드 개발자 모의면접',
-    company: '카카오',
     position: '백엔드',
     date: '2026.06.15',
     score: 78,
@@ -73,8 +88,7 @@ export const recentInterviews = [
   },
   {
     id: 'iv-102',
-    title: '네이버 프론트엔드 실전면접',
-    company: '네이버',
+    title: '프론트엔드 실전면접',
     position: '프론트엔드',
     date: '2026.06.10',
     score: 88,
@@ -82,8 +96,7 @@ export const recentInterviews = [
   },
   {
     id: 'iv-101',
-    title: '쿠팡 풀스택 면접',
-    company: '쿠팡',
+    title: '풀스택 모의면접',
     position: '풀스택',
     date: '2026.06.04',
     score: 72,
@@ -138,7 +151,7 @@ export const interviewers = [
     name: '박지영',
     role: 'HR Manager',
     roleKo: 'HR 매니저',
-    focus: ['커뮤니케이션', '협업', '동기부여'],
+    focus: ['창의성', '협업', '동기부여'],
     accent: 'from-pink-500 to-rose-500',
     initials: 'PJ',
   },
@@ -284,17 +297,294 @@ export const realtimeFeedback = [
 
 export const liveScores = [
   { label: '기술 지식', value: 82, color: 'indigo' as const },
-  { label: '커뮤니케이션', value: 76, color: 'sky' as const },
+  { label: '창의성', value: 76, color: 'sky' as const },
   { label: '자신감', value: 71, color: 'violet' as const },
   { label: '면접 태도', value: 84, color: 'emerald' as const },
 ]
 
 export const categoryScores = [
   { axis: '기술 지식', value: 86, full: 100 },
-  { axis: '커뮤니케이션', value: 78, full: 100 },
+  { axis: '창의성', value: 78, full: 100 },
   { axis: '문제 해결', value: 82, full: 100 },
   { axis: '협업', value: 74, full: 100 },
   { axis: '면접 태도', value: 88, full: 100 },
+]
+
+export type PortfolioStatus = 'published' | 'draft'
+
+export const myPortfolios = [
+  {
+    id: 'pf-001',
+    title: '윤효연 · 프론트엔드 포트폴리오',
+    slug: 'yhy-frontend',
+    description: 'React, TypeScript 기반 6개 프로젝트를 모은 메인 포트폴리오',
+    status: 'published' as PortfolioStatus,
+    source: 'github' as const,
+    theme: 'Aurora',
+    projectsCount: 6,
+    views: 1284,
+    updatedAt: '2026-06-20',
+  },
+  {
+    id: 'pf-002',
+    title: 'AI 사이드 프로젝트 모음',
+    slug: 'yhy-ai-lab',
+    description: 'LLM 활용 프로토타입 위주의 실험적 포트폴리오',
+    status: 'draft' as PortfolioStatus,
+    source: 'github' as const,
+    theme: 'Midnight',
+    projectsCount: 3,
+    views: 0,
+    updatedAt: '2026-06-12',
+  },
+  {
+    id: 'pf-003',
+    title: '이력서 2026',
+    slug: '',
+    description: 'yhy_resume_2026.pdf',
+    status: 'draft' as PortfolioStatus,
+    source: 'pdf' as const,
+    theme: '',
+    projectsCount: 0,
+    views: 0,
+    updatedAt: '2026-06-10',
+  },
+]
+
+export const portfolioDetails: Record<string, {
+  title: string
+  phone: string
+  email: string
+  homepage?: string
+  github: string
+  bio: string
+  experiences: { company: string; role: string; period: string }[]
+  projects: { name: string; period: string; summary: string; stack: string[]; detail: string }[]
+  educations: { school: string; period: string }[]
+  activities: { title: string; description: string }[]
+  skills: Record<string, string[]>
+}> = {
+  'pf-001': {
+    title: '안녕하세요, 프론트엔드 개발자 윤효연입니다.',
+    phone: '010-1234-5678',
+    email: 'loveyhy2002@gmail.com',
+    homepage: 'https://yhy.dev',
+    github: 'https://github.com/yoonhyoyeon',
+    bio: '사용자 경험과 코드 품질을 모두 챙기는 프론트엔드 개발자입니다. React/TypeScript 기반으로 3년간 서비스를 개발했고, 디자인 시스템 구축과 인터랙션 디테일에 강합니다. 팀의 DX를 개선하는 작업을 즐깁니다.',
+    experiences: [
+      { company: '토스', role: '프론트엔드 개발자', period: '2024.03 ~ 현재' },
+      { company: '카카오엔터프라이즈', role: '프론트엔드 개발자', period: '2022.07 ~ 2024.02' },
+      { company: '넥스트스텝', role: '프론트엔드 인턴', period: '2022.01 ~ 2022.06' },
+    ],
+    projects: [
+      {
+        name: 'Proofolio — AI 면접 코칭 서비스',
+        period: '2025.09 ~ 현재',
+        summary: '실시간 자세·시선 분석과 STT를 결합한 AI 면접 코칭 플랫폼.',
+        stack: ['React', 'TypeScript', 'TailwindCSS', 'MediaPipe', 'Vite'],
+        detail: 'MediaPipe FaceLandmarker/PoseLandmarker로 카메라 피드를 실시간 분석해 정면 응시·자세 안정성·움직임 지수를 산출합니다. Web Speech API 기반 STT로 필러 단어와 발화 속도를 감지하고, 면접 종료 후 종합 리포트를 생성합니다.',
+      },
+      {
+        name: '디자인 시스템 v2 구축',
+        period: '2024.06 ~ 2024.11',
+        summary: '레거시 컴포넌트 230개를 토큰 기반 디자인 시스템으로 재구축.',
+        stack: ['React', 'TypeScript', 'Storybook', 'CSS Variables', 'Figma'],
+        detail: 'CSS Custom Properties를 활용한 멀티 테마 시스템 도입. Storybook + Chromatic으로 시각적 회귀 테스트를 자동화했고, 빌드 번들 사이즈 22% 절감, 컴포넌트 재사용률 68%까지 향상했습니다.',
+      },
+      {
+        name: 'Pose Coach SDK',
+        period: '2025.03 ~ 2025.07',
+        summary: 'MediaPipe 기반 자세 분석 라이브러리. GitHub 87 stars.',
+        stack: ['TypeScript', 'MediaPipe', 'Canvas API', 'Rollup'],
+        detail: '브라우저에서 실행 가능한 경량 자세 분석 SDK. GPU delegate 활용으로 추론 속도 40% 개선, 60fps 드로잉 루프와 16fps 추론 루프를 분리해 UI 블로킹을 최소화했습니다.',
+      },
+    ],
+    educations: [
+      { school: '한국대학교 컴퓨터공학과', period: '2018.03 ~ 2022.02' },
+    ],
+    activities: [
+      { title: '2025 FEConf 발표 — "MediaPipe로 만드는 실시간 AI 코칭"', description: '600명 이상 참석. 브라우저 내 실시간 ML 추론 패턴 공유.' },
+      { title: 'React 공식 문서 한국어 번역 기여', description: 'useEffect, useMemo 섹션 번역 및 리뷰 참여.' },
+      { title: '기술 블로그 운영', description: 'https://yhy.dev/blog — 월 평균 8,000 PV, 구독자 1,200명.' },
+    ],
+    skills: {
+      Frontend: ['HTML', 'CSS/SCSS', 'JavaScript', 'TypeScript', 'React.js', 'Next.js', 'Vite', 'TailwindCSS'],
+      Design: ['Figma', 'Storybook', 'CSS Variables'],
+      Backend: ['Node.js', 'Python'],
+      Tooling: ['Git', 'Turborepo', 'Chromatic', 'Sentry'],
+    },
+  },
+  'pf-002': {
+    title: '안녕하세요, 프론트엔드 개발자 윤효연입니다.',
+    phone: '010-1234-5678',
+    email: 'loveyhy2002@gmail.com',
+    github: 'https://github.com/yoonhyoyeon',
+    bio: 'LLM과 브라우저 기술을 연결하는 실험적인 사이드 프로젝트를 주로 합니다.',
+    experiences: [
+      { company: '토스', role: '프론트엔드 개발자', period: '2024.03 ~ 현재' },
+    ],
+    projects: [
+      {
+        name: 'LLM Router',
+        period: '2026.01 ~ 2026.03',
+        summary: '여러 LLM 공급자를 라우팅하는 경량 게이트웨이.',
+        stack: ['Python', 'FastAPI', 'OpenAI SDK', 'Anthropic SDK'],
+        detail: '프롬프트 복잡도와 비용을 기준으로 Claude / GPT-4o / Gemini를 자동 선택. 폴백 로직과 스트리밍 지원 포함.',
+      },
+      {
+        name: 'LLM Prompt Experiments',
+        period: '2025.11 ~ 2026.01',
+        summary: 'CoT, RAG, Function Calling 패턴 실험 저장소.',
+        stack: ['Python', 'LangChain', 'ChromaDB'],
+        detail: '다양한 프롬프트 전략을 비교 실험하고 결과를 Markdown으로 문서화.',
+      },
+    ],
+    educations: [
+      { school: '한국대학교 컴퓨터공학과', period: '2018.03 ~ 2022.02' },
+    ],
+    activities: [
+      { title: 'LLM Router — Product Hunt #3 of the Day', description: '2026년 3월 출시 당일 Product Hunt 3위 달성.' },
+    ],
+    skills: {
+      Frontend: ['React.js', 'TypeScript'],
+      Backend: ['Python', 'FastAPI', 'Node.js'],
+      AI: ['LangChain', 'ChromaDB', 'OpenAI API', 'Anthropic API'],
+    },
+  },
+}
+
+export const portfolioTemplates = [
+  {
+    id: 'aurora',
+    name: 'Aurora',
+    description: '그라데이션과 화이트 톤. 프론트엔드/디자이너 추천.',
+    accent: 'from-indigo-500 to-violet-500',
+  },
+  {
+    id: 'midnight',
+    name: 'Midnight',
+    description: '딥블루 배경에 미니멀 타이포. 백엔드/AI 추천.',
+    accent: 'from-slate-700 to-slate-900',
+  },
+  {
+    id: 'sunrise',
+    name: 'Sunrise',
+    description: '밝은 코랄/오렌지 톤. 풀스택/사이드프로젝트에 적합.',
+    accent: 'from-amber-400 to-rose-500',
+  },
+]
+
+export const githubRepos = [
+  {
+    id: 'r1',
+    name: 'proofolio-frontend',
+    description: 'AI 면접 코칭 서비스의 프론트엔드 (React + TS)',
+    language: 'TypeScript',
+    stars: 142,
+    forks: 18,
+    updatedAt: '2026-06-22',
+    topics: ['react', 'vite', 'tailwind'],
+    visibility: 'public' as const,
+  },
+  {
+    id: 'r2',
+    name: 'pose-coach-sdk',
+    description: 'MediaPipe 기반 자세 분석 SDK',
+    language: 'TypeScript',
+    stars: 87,
+    forks: 9,
+    updatedAt: '2026-05-30',
+    topics: ['mediapipe', 'sdk', 'computer-vision'],
+    visibility: 'public' as const,
+  },
+  {
+    id: 'r3',
+    name: 'next-blog-template',
+    description: 'MDX 기반 개발 블로그 보일러플레이트',
+    language: 'TypeScript',
+    stars: 56,
+    forks: 12,
+    updatedAt: '2026-04-11',
+    topics: ['nextjs', 'mdx', 'blog'],
+    visibility: 'public' as const,
+  },
+  {
+    id: 'r4',
+    name: 'proofolio-internal-experiments',
+    description: '사내 실험용 비공개 레포 — LLM 프롬프트 실험',
+    language: 'Python',
+    stars: 0,
+    forks: 0,
+    updatedAt: '2026-06-03',
+    topics: ['llm', 'experiments'],
+    visibility: 'private' as const,
+  },
+  {
+    id: 'r5',
+    name: 'side-fintech-app',
+    description: '개인 사이드 프로젝트 — 가계부 + 카드 추천 (비공개)',
+    language: 'TypeScript',
+    stars: 0,
+    forks: 0,
+    updatedAt: '2026-05-15',
+    topics: ['nextjs', 'fintech'],
+    visibility: 'private' as const,
+  },
+  {
+    id: 'r6',
+    name: 'dotfiles',
+    description: '개인 개발 환경 설정 모음',
+    language: 'Shell',
+    stars: 8,
+    forks: 0,
+    updatedAt: '2026-02-18',
+    topics: ['zsh', 'neovim'],
+    visibility: 'public' as const,
+  },
+]
+
+export const pdfExtractedPreview = {
+  fileName: 'yhy_portfolio_2026.pdf',
+  pages: 7,
+  projects: [
+    {
+      id: 'p1',
+      title: 'Proofolio · AI 면접 코칭',
+      summary:
+        '실시간 자세/시선 분석과 음성 STT를 결합한 AI 면접 코칭 서비스. 프론트엔드 리드.',
+      tags: ['React', 'TypeScript', 'MediaPipe'],
+    },
+    {
+      id: 'p2',
+      title: '디자인 시스템 마이그레이션',
+      summary:
+        '레거시 UI 컴포넌트 230개를 토큰 기반 디자인 시스템으로 재구축, 빌드 사이즈 22% 절감.',
+      tags: ['Design System', 'Tailwind', 'Storybook'],
+    },
+    {
+      id: 'p3',
+      title: '커머스 결제 모듈 리팩토링',
+      summary:
+        '결제 흐름의 상태 머신을 도입해 결제 실패율 1.4%p 개선, A/B 테스트 인프라 정착.',
+      tags: ['XState', 'A/B Test', 'Sentry'],
+    },
+  ],
+  skills: ['React', 'TypeScript', 'Next.js', 'TailwindCSS', 'Node.js'],
+}
+
+export const portfolioSkillSuggestions = [
+  'React',
+  'TypeScript',
+  'Next.js',
+  'Vite',
+  'TailwindCSS',
+  'Node.js',
+  'GraphQL',
+  'Figma',
+  'Python',
+  'MediaPipe',
+  'AWS',
+  'Docker',
 ]
 
 export const interviewerFeedback = [
@@ -411,9 +701,11 @@ export const questionReview = [
 ]
 
 export const attitudeMetrics = [
+  // 시각
   {
     key: 'eye',
-    label: '시선 처리율 (Eye Contact)',
+    group: '시각' as const,
+    label: '시선처리',
     value: 82,
     unit: '%',
     comment: '안정적인 시선 유지',
@@ -421,43 +713,83 @@ export const attitudeMetrics = [
   },
   {
     key: 'head',
-    label: '고개 숙임 비율',
-    value: 14,
-    unit: '%',
+    group: '시각' as const,
+    label: '고개숙임 횟수',
+    value: 8,
+    unit: '회',
+    barPercent: 32,
     comment: '약간 잦은 편이에요',
     tone: 'warning' as const,
   },
   {
+    key: 'hand',
+    group: '시각' as const,
+    label: '손 움직임 횟수',
+    value: 12,
+    unit: '회',
+    barPercent: 40,
+    comment: '보통 수준',
+    tone: 'neutral' as const,
+  },
+  {
     key: 'posture',
+    group: '시각' as const,
     label: '자세 안정성',
     value: 76,
     unit: '%',
     comment: '대체로 안정적',
     tone: 'success' as const,
   },
+  // 음성
   {
-    key: 'hand',
-    label: '손 움직임 빈도',
-    value: 58,
+    key: 'speed',
+    group: '음성' as const,
+    label: '발화속도',
+    value: 320,
+    unit: '음절/분',
+    barPercent: 75,
+    comment: '약간 빠른 편',
+    tone: 'warning' as const,
+  },
+  {
+    key: 'intonation',
+    group: '음성' as const,
+    label: '억양 안정성',
+    value: 71,
     unit: '%',
     comment: '보통 수준',
     tone: 'neutral' as const,
   },
   {
-    key: 'speed',
-    label: '말하기 속도',
-    value: 84,
-    unit: '%',
-    comment: '약간 빠른 편',
-    tone: 'warning' as const,
+    key: 'volume',
+    group: '음성' as const,
+    label: '음량',
+    value: 68,
+    unit: 'dB',
+    barPercent: 68,
+    comment: '적절한 음량',
+    tone: 'success' as const,
   },
   {
     key: 'filler',
-    label: '필러 단어 (음/어)',
+    group: '음성' as const,
+    label: '습관어 횟수',
     value: 23,
     unit: '회',
+    barPercent: 46,
     comment: '23회 감지됨',
+    note: '음, 어, 그러니까',
     tone: 'warning' as const,
+  },
+  {
+    key: 'delay',
+    group: '음성' as const,
+    label: '답변지연 시간',
+    value: 4.2,
+    unit: '초',
+    barPercent: 42,
+    comment: '평균 4.2초',
+    tone: 'neutral' as const,
   },
 ]
 
@@ -466,7 +798,6 @@ export const reportList = [
     id: 'iv-104',
     title: '프론트엔드 개발자 모의면접',
     position: '프론트엔드',
-    company: '토스',
     date: '2026.06.20',
     score: 84,
     mode: 'practice',
@@ -476,7 +807,6 @@ export const reportList = [
     id: 'iv-103',
     title: '백엔드 개발자 모의면접',
     position: '백엔드',
-    company: '카카오',
     date: '2026.06.15',
     score: 78,
     mode: 'practice',
@@ -484,9 +814,8 @@ export const reportList = [
   },
   {
     id: 'iv-102',
-    title: '네이버 프론트엔드 실전면접',
+    title: '프론트엔드 실전면접',
     position: '프론트엔드',
-    company: '네이버',
     date: '2026.06.10',
     score: 88,
     mode: 'real',
@@ -494,9 +823,8 @@ export const reportList = [
   },
   {
     id: 'iv-101',
-    title: '쿠팡 풀스택 면접',
+    title: '풀스택 모의면접',
     position: '풀스택',
-    company: '쿠팡',
     date: '2026.06.04',
     score: 72,
     mode: 'practice',
@@ -504,9 +832,8 @@ export const reportList = [
   },
   {
     id: 'iv-100',
-    title: '라인 프론트엔드 모의면접',
+    title: '프론트엔드 모의면접',
     position: '프론트엔드',
-    company: '라인',
     date: '2026.05.28',
     score: 76,
     mode: 'practice',
@@ -514,9 +841,8 @@ export const reportList = [
   },
   {
     id: 'iv-099',
-    title: '배민 백엔드 실전면접',
+    title: '백엔드 실전면접',
     position: '백엔드',
-    company: '배민',
     date: '2026.05.20',
     score: 81,
     mode: 'real',
@@ -526,7 +852,6 @@ export const reportList = [
     id: 'iv-098',
     title: 'AI 엔지니어 모의면접',
     position: 'AI 엔지니어',
-    company: '뤼튼',
     date: '2026.05.12',
     score: 69,
     mode: 'practice',
@@ -534,9 +859,8 @@ export const reportList = [
   },
   {
     id: 'iv-097',
-    title: '당근 프로덕트 디자이너',
+    title: '프로덕트 디자이너 모의면접',
     position: '디자이너',
-    company: '당근',
     date: '2026.05.03',
     score: 74,
     mode: 'practice',

@@ -23,7 +23,7 @@ export function ReportsPage() {
           <div className="relative w-full max-w-xs">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-fg-subtle)]" />
             <Input
-              placeholder="면접 제목, 회사명으로 검색"
+              placeholder="면접 제목으로 검색"
               className="pl-9"
             />
           </div>
@@ -36,14 +36,6 @@ export function ReportsPage() {
               <option value="ai">AI 엔지니어</option>
               <option value="designer">디자이너</option>
               <option value="pm">PM</option>
-            </Select>
-            <Select defaultValue="all" className="h-9 w-[140px]">
-              <option value="all">전체 회사</option>
-              <option value="naver">네이버</option>
-              <option value="kakao">카카오</option>
-              <option value="toss">토스</option>
-              <option value="coupang">쿠팡</option>
-              <option value="line">라인</option>
             </Select>
             <Button variant="outline" size="sm" className="gap-1.5">
               <ArrowUpDown className="h-3.5 w-3.5" />
@@ -58,7 +50,6 @@ export function ReportsPage() {
               <tr className="border-b border-[var(--color-border)] text-left text-xs font-medium text-[var(--color-fg-muted)]">
                 <th className="px-6 py-3">면접 제목</th>
                 <th className="py-3 pr-4">직무</th>
-                <th className="py-3 pr-4">회사</th>
                 <th className="py-3 pr-4">날짜</th>
                 <th className="py-3 pr-4">모드</th>
                 <th className="py-3 pr-4">점수</th>
@@ -75,9 +66,6 @@ export function ReportsPage() {
                   <td className="px-6 py-4">{row.title}</td>
                   <td className="py-4 pr-4 text-[var(--color-fg-muted)]">
                     {row.position}
-                  </td>
-                  <td className="py-4 pr-4 text-[var(--color-fg-muted)]">
-                    {row.company}
                   </td>
                   <td className="py-4 pr-4 text-[var(--color-fg-muted)]">
                     {row.date}

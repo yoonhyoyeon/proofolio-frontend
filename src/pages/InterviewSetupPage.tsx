@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, Sparkles } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, FileText, Github, Sparkles } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -11,16 +11,23 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { WizardStepper } from '@/components/domain/WizardStepper'
 import { DropZone } from '@/components/domain/DropZone'
 import { ModeCard } from '@/components/domain/ModeCard'
-import { popularCompanies, positions } from '@/lib/mock'
+import { myPortfolios, positions } from '@/lib/mock'
 
-const STEPS = ['PDF 업로드', '직무 선택', '회사 입력', '채용 공고', '면접 모드']
+const STEPS = ['포트폴리오 선택', '직무 선택', '채용 공고', '면접 모드']
 
 export function InterviewSetupPage() {
   const [step, setStep] = useState(0)
+  const [selectedPortfolios, setSelectedPortfolios] = useState<string[]>([])
   const [mode, setMode] = useState<'practice' | 'real'>('practice')
   const [position, setPosition] = useState('frontend')
-  const [company, setCompany] = useState('토스')
   const navigate = useNavigate()
+
+  const togglePortfolio = (id: string) =>
+    setSelectedPortfolios((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    )
+
+  const canGoNext = step === 0 ? selectedPortfolios.length > 0 : true
 
   const next = () => setStep((s) => Math.min(STEPS.length - 1, s + 1))
   const prev = () => setStep((s) => Math.max(0, s - 1))
@@ -41,16 +48,68 @@ export function InterviewSetupPage() {
         <CardContent className="min-h-[420px] px-8 py-8">
           {step === 0 && (
             <StepWrap
-              title="PDF 파일을 업로드해 주세요"
-              description="이력서·포트폴리오 구분 없이 PDF 파일만 받습니다. 여러 개를 한 번에 올릴 수 있어요. 파일은 면접 종료 후 자동 삭제됩니다."
+              title="포트폴리오를 선택해 주세요"
+              description="저장된 포트폴리오를 하나 이상 선택하면 AI 면접관이 내용을 분석해 맞춤 질문을 준비합니다."
             >
-              <DropZone
-                label="PDF 파일"
-                hint="PDF · 파일당 최대 25MB · 여러 파일 업로드 가능"
-                accept=".pdf"
-                multiple
-                initialFileNames={['yhy_resume_2026.pdf']}
-              />
+              <div className="flex flex-col gap-3">
+                {myPortfolios.map((pf) => {
+                  const selected = selectedPortfolios.includes(pf.id)
+                  return (
+                    <button
+                      key={pf.id}
+                      type="button"
+                      onClick={() => togglePortfolio(pf.id)}
+                      className={
+                        'flex items-center gap-4 rounded-[var(--radius-md)] border p-4 text-left transition-colors ' +
+                        (selected
+                          ? 'border-[var(--color-brand)] bg-[var(--color-brand-subtle)]'
+                          : 'border-[var(--color-border)] bg-white hover:border-[var(--color-brand)]/40 hover:bg-[var(--color-surface)]')
+                      }
+                    >
+                      <span
+                        className={
+                          'grid h-5 w-5 shrink-0 place-items-center rounded border transition-colors ' +
+                          (selected
+                            ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white'
+                            : 'border-[var(--color-border)] bg-white')
+                        }
+                      >
+                        {selected && <Check className="h-3 w-3" />}
+                      </span>
+                      <span
+                        className={
+                          'grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-sm)] ' +
+                          (pf.source === 'github'
+                            ? 'bg-slate-900 text-white'
+                            : 'bg-[var(--color-brand-subtle)] text-[var(--color-brand)]')
+                        }
+                      >
+                        {pf.source === 'github' ? (
+                          <Github className="h-4 w-4" />
+                        ) : (
+                          <FileText className="h-4 w-4" />
+                        )}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="truncate text-sm font-semibold text-[var(--color-fg)]">
+                            {pf.title}
+                          </p>
+                          <Badge tone={pf.source === 'github' ? 'neutral' : 'outline'} className="shrink-0">
+                            {pf.source === 'github' ? 'GitHub' : 'PDF'}
+                          </Badge>
+                        </div>
+                        <p className="mt-0.5 truncate text-xs text-[var(--color-fg-muted)]">
+                          {pf.description}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-xs text-[var(--color-fg-subtle)]">
+                        {pf.updatedAt}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
             </StepWrap>
           )}
 
@@ -85,40 +144,6 @@ export function InterviewSetupPage() {
           )}
 
           {step === 2 && (
-            <StepWrap
-              title="목표하는 회사가 있나요?"
-              description="회사명을 입력하면 해당 회사의 면접 스타일을 반영합니다."
-              badge="선택사항"
-            >
-              <div className="flex flex-col gap-4">
-                <Input
-                  value={company}
-                  onChange={(e) => setCompany(e.target.value)}
-                  placeholder="예: 네이버, 카카오, 토스…"
-                  className="h-11 text-base"
-                />
-                <div className="flex flex-wrap gap-2">
-                  {popularCompanies.map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      onClick={() => setCompany(c)}
-                      className={
-                        'inline-flex h-8 items-center rounded-full border px-3 text-xs font-medium transition-colors ' +
-                        (company === c
-                          ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white'
-                          : 'border-[var(--color-border)] bg-white text-[var(--color-fg-muted)] hover:border-[var(--color-brand)]/40 hover:text-[var(--color-fg)]')
-                      }
-                    >
-                      {c}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </StepWrap>
-          )}
-
-          {step === 3 && (
             <StepWrap
               title="채용 공고 정보를 입력해 주세요"
               description="공고의 자격요건/우대사항을 기반으로 면접 질문이 만들어집니다."
@@ -155,7 +180,7 @@ export function InterviewSetupPage() {
             </StepWrap>
           )}
 
-          {step === 4 && (
+          {step === 3 && (
             <StepWrap
               title="어떤 분위기로 면접을 볼까요?"
               description="모드는 면접 시작 후 변경할 수 없습니다."
@@ -207,7 +232,7 @@ export function InterviewSetupPage() {
           </Button>
 
           {step < STEPS.length - 1 ? (
-            <Button size="md" onClick={next} className="gap-1">
+            <Button size="md" onClick={next} disabled={!canGoNext} className="gap-1">
               다음
               <ArrowRight className="h-4 w-4" />
             </Button>
@@ -219,7 +244,7 @@ export function InterviewSetupPage() {
           )}
         </div>
 
-        <PreviewBar position={position} company={company} mode={mode} />
+        <PreviewBar position={position} mode={mode} />
       </Card>
 
       <p className="mt-4 text-center text-xs text-[var(--color-fg-subtle)]">
@@ -263,11 +288,9 @@ function StepWrap({
 
 function PreviewBar({
   position,
-  company,
   mode,
 }: {
   position: string
-  company: string
   mode: 'practice' | 'real'
 }) {
   const posLabel =
@@ -276,7 +299,6 @@ function PreviewBar({
     <div className="flex flex-wrap items-center gap-2 border-t border-[var(--color-border)] bg-[var(--color-surface)] px-8 py-3 text-xs text-[var(--color-fg-muted)]">
       <span className="font-medium">현재 설정</span>
       <Badge tone="brand">{posLabel}</Badge>
-      <Badge tone="neutral">{company || '회사 미정'}</Badge>
       <Badge tone={mode === 'real' ? 'dark' : 'outline'}>
         {mode === 'real' ? '실전 모드' : '연습 모드'}
       </Badge>

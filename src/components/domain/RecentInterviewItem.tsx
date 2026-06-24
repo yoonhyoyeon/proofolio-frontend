@@ -6,7 +6,6 @@ import { ScorePill } from './ScorePill'
 interface RecentInterviewItemProps {
   id: string
   title: string
-  company: string
   position: string
   date: string
   score: number
@@ -16,7 +15,6 @@ interface RecentInterviewItemProps {
 export function RecentInterviewItem({
   id,
   title,
-  company,
   position,
   date,
   score,
@@ -28,14 +26,14 @@ export function RecentInterviewItem({
       className="group flex items-center gap-3 rounded-[var(--radius-md)] px-3 py-3 transition-colors hover:bg-[var(--color-surface)]"
     >
       <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-gradient-to-br from-slate-100 to-slate-200 text-xs font-semibold text-slate-600">
-        {company.slice(0, 1)}
+        {position.slice(0, 2)}
       </span>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold text-[var(--color-fg)]">
           {title}
         </p>
         <p className="mt-0.5 truncate text-xs text-[var(--color-fg-muted)]">
-          {company} · {position} · {date}
+          {position} · {date}
         </p>
       </div>
       <Badge
