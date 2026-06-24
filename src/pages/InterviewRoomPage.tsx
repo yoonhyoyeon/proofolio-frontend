@@ -24,11 +24,13 @@ import {
 } from '@/components/domain/PoseMeshOverlay'
 import { RealtimeFeedbackPanel } from '@/components/domain/RealtimeFeedbackPanel'
 import { LiveScoreGrid, type LiveScoreItem } from '@/components/domain/LiveScoreGrid'
+import { LiveWaveGraph } from '@/components/domain/LiveWaveGraph'
 import { interviewers, interviewMeta, currentUser } from '@/lib/mock'
 import { useInterviewAudio, type ConnectionStatus } from '@/hooks/useInterviewAudio'
 import { useInterviewerTTS } from '@/hooks/useInterviewerTTS'
 import { useSpeechMetrics } from '@/hooks/useSpeechMetrics'
-import { postureFeedback } from '@/lib/feedback'
+import { useAudioAnalysis } from '@/hooks/useAudioAnalysis'
+import { postureFeedback, speechFeedbackFromAudio } from '@/lib/feedback'
 import { voiceFor } from '@/lib/tts'
 import {
   pickQuestionFor,
@@ -93,6 +95,8 @@ export function InterviewRoomPage() {
   // Live vision metrics (client, immediate) + speech metrics (from backend)
   const [metrics, setMetrics] = useState<LiveMetrics | null>(null)
   const { metrics: speech, feedback: speechFeedback } = useSpeechMetrics()
+  // Volume + intonation computed client-side via Web Audio (practice mode, mic on)
+  const audio = useAudioAnalysis(!isReal && micOn)
 
   const round = (n: number | null) => (n === null ? null : Math.round(n))
 
@@ -102,10 +106,8 @@ export function InterviewRoomPage() {
     { label: '고개 숙임', value: metrics ? metrics.headDownCount : null, color: 'rose', unit: '회' },
     { label: '손 움직임', value: metrics ? metrics.handRaiseCount : null, color: 'amber', unit: '회' },
     { label: '자세 안정성', value: metrics ? Math.round(metrics.posture) : null, color: 'sky' },
-    // 5–9: speech, supplied by the backend
+    // 5–9: speech — 음량/억양은 아래 파형 그래프로 표시, 나머지는 백엔드
     { label: '발화 속도', value: round(speech.speechRate), color: 'violet' },
-    { label: '억양 안정성', value: round(speech.intonation), color: 'emerald' },
-    { label: '음량', value: round(speech.volume), color: 'indigo' },
     {
       label: '습관어',
       value: speech.fillerCount,
@@ -121,9 +123,13 @@ export function InterviewRoomPage() {
     },
   ]
 
-  // Real-time feedback: posture (client, immediate) + speech (from backend)
+  // Real-time feedback: posture + speech (client, immediate) + speech (from backend)
   const feedbackItems = [
     ...(metrics ? postureFeedback(metrics) : []),
+    ...speechFeedbackFromAudio({
+      intonation: audio.intonation,
+      volumeHistory: audio.volumeHistory,
+    }),
     ...speechFeedback,
   ]
 
@@ -201,6 +207,31 @@ export function InterviewRoomPage() {
             </SidePanelSection>
             <SidePanelSection title="실시간 점수" badge={metrics ? 'LIVE' : undefined}>
               <LiveScoreGrid scores={liveScores} />
+            </SidePanelSection>
+            <SidePanelSection
+              title="음성 분석"
+              badge={audio.volume !== null ? 'LIVE' : undefined}
+            >
+              <div className="grid grid-cols-1 gap-2">
+                <LiveWaveGraph
+                  label="음량 레벨"
+                  value={audio.volume}
+                  history={audio.volumeHistory}
+                  color="indigo"
+                  min={0}
+                  max={100}
+                />
+                <LiveWaveGraph
+                  label="억양 변동"
+                  value={audio.intonation}
+                  history={audio.intonationHistory}
+                  color="emerald"
+                  unit="반음"
+                  min={0}
+                  max={6}
+                  decimals={2}
+                />
+              </div>
             </SidePanelSection>
           </aside>
         )}

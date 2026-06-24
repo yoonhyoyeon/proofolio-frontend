@@ -191,6 +191,7 @@ export function PoseMeshOverlay({
   const countRef = useRef({ headDown: 0, handRaise: 0 })
   const headDownStateRef = useRef(false)
   const handRaiseStateRef = useRef(false)
+  const lastRaiseAtRef = useRef(0) // debounce between hand-raise counts
 
   // Keep latest props available to the rAF loop without re-creating it
   const layersRef = useRef(layers)
@@ -320,23 +321,33 @@ export function PoseMeshOverlay({
         }
       }
 
-      // Abnormal hand raises — wrist above the shoulder line (edge-triggered)
+      // Abnormal hand raises — counted once per *large* gesture (hand goes
+      // clearly above the shoulder, then back down). Hysteresis + debounce so
+      // small finger/hand jitter while held up doesn't keep counting.
       if (poseLm) {
         const ls = poseLm[11]
         const rs = poseLm[12]
-        if (ls && rs) {
+        const wrists = [poseLm[15], poseLm[16]].filter(isVisible)
+        if (ls && rs && wrists.length > 0) {
           const shoulderY = (ls.y + rs.y) / 2
           const sw = Math.hypot(rs.x - ls.x, rs.y - ls.y) || 1e-3
-          const raised = [poseLm[15], poseLm[16]]
-            .filter(isVisible)
-            .some((w) => w.y < shoulderY - sw * 0.1)
-          if (!handRaiseStateRef.current && raised) {
+          const highestWristY = Math.min(...wrists.map((w) => w.y)) // smaller y = higher
+          const enterY = shoulderY - sw * 0.4 // must rise clearly above the shoulder
+          const exitY = shoulderY - sw * 0.05 // must come back down to reset
+
+          if (
+            !handRaiseStateRef.current &&
+            highestWristY < enterY &&
+            now - lastRaiseAtRef.current >= 700
+          ) {
             handRaiseStateRef.current = true
+            lastRaiseAtRef.current = now
             countRef.current.handRaise += 1
-          } else if (handRaiseStateRef.current && !raised) {
+          } else if (handRaiseStateRef.current && highestWristY > exitY) {
             handRaiseStateRef.current = false
           }
         }
+        // wrists not visible → hold current state (avoid recount on flicker)
       }
 
       if (now - lastEmitRef.current >= EMIT_INTERVAL) {

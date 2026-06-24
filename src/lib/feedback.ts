@@ -67,3 +67,52 @@ export function postureFeedback(m: LiveMetrics): FeedbackItem[] {
 
   return items
 }
+
+/**
+ * Immediate speech feedback derived client-side from the Web Audio metrics
+ * (음량 레벨 0~60, 억양 변동 반음). Only fires while the user is actually
+ * speaking (recent volume above a floor) to avoid nagging during silence.
+ */
+export function speechFeedbackFromAudio(a: {
+  intonation: number | null
+  volumeHistory: number[]
+}): FeedbackItem[] {
+  const items: FeedbackItem[] = []
+  const recent = a.volumeHistory.slice(-12) // ~2s (volume level 0~100)
+  // Judge loudness from the louder (speaking) samples, ignoring pauses
+  const loud = recent.filter((v) => v >= 12)
+  const speaking = loud.length >= 3
+  if (!speaking) return items
+
+  const avg = loud.reduce((s, v) => s + v, 0) / loud.length
+  if (avg < 30) {
+    items.push({
+      id: 'vol-low',
+      severity: 'warning',
+      title: '목소리가 작아요',
+      detail: '조금 더 또렷하고 크게 말해보세요.',
+      source: 'speech',
+    })
+  } else if (avg > 70) {
+    items.push({
+      id: 'vol-high',
+      severity: 'info',
+      title: '목소리가 큰 편이에요',
+      detail: '편안한 크기로 조절해보세요.',
+      source: 'speech',
+    })
+  }
+
+  // 단조로움(낮은 변동)은 피드백하지 않음. 3.0반음 이상이면 기복 큼.
+  if (a.intonation !== null && a.intonation >= 3.0) {
+    items.push({
+      id: 'into-wide',
+      severity: 'warning',
+      title: '억양 기복이 커요',
+      detail: '차분하고 일정한 톤을 유지해보세요.',
+      source: 'speech',
+    })
+  }
+
+  return items
+}
