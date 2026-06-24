@@ -27,6 +27,8 @@ import { LiveScoreGrid, type LiveScoreItem } from '@/components/domain/LiveScore
 import { interviewers, interviewMeta, currentUser } from '@/lib/mock'
 import { useInterviewAudio, type ConnectionStatus } from '@/hooks/useInterviewAudio'
 import { useInterviewerTTS } from '@/hooks/useInterviewerTTS'
+import { useSpeechMetrics } from '@/hooks/useSpeechMetrics'
+import { postureFeedback } from '@/lib/feedback'
 import { voiceFor } from '@/lib/tts'
 import {
   pickQuestionFor,
@@ -88,16 +90,42 @@ export function InterviewRoomPage() {
 
   const { status, micOn, toggleMic, transcriptText } = useInterviewAudio()
 
-  // Live vision metrics from the MediaPipe overlay
+  // Live vision metrics (client, immediate) + speech metrics (from backend)
   const [metrics, setMetrics] = useState<LiveMetrics | null>(null)
-  const liveScores: LiveScoreItem[] | undefined = metrics
-    ? [
-        { label: '정면 응시', value: Math.round(metrics.gaze), color: 'indigo' },
-        { label: '자세 안정성', value: Math.round(metrics.posture), color: 'sky' },
-        { label: '움직임 안정', value: Math.round(metrics.stability), color: 'violet' },
-        { label: '종합 자신감', value: Math.round(metrics.confidence), color: 'emerald' },
-      ]
-    : undefined
+  const { metrics: speech, feedback: speechFeedback } = useSpeechMetrics()
+
+  const round = (n: number | null) => (n === null ? null : Math.round(n))
+
+  const liveScores: LiveScoreItem[] = [
+    // 1–4: vision, reflected immediately
+    { label: '시선 처리', value: metrics ? Math.round(metrics.gaze) : null, color: 'indigo' },
+    { label: '고개 숙임', value: metrics ? metrics.headDownCount : null, color: 'rose', unit: '회' },
+    { label: '손 움직임', value: metrics ? metrics.handRaiseCount : null, color: 'amber', unit: '회' },
+    { label: '자세 안정성', value: metrics ? Math.round(metrics.posture) : null, color: 'sky' },
+    // 5–9: speech, supplied by the backend
+    { label: '발화 속도', value: round(speech.speechRate), color: 'violet' },
+    { label: '억양 안정성', value: round(speech.intonation), color: 'emerald' },
+    { label: '음량', value: round(speech.volume), color: 'indigo' },
+    {
+      label: '습관어',
+      value: speech.fillerCount,
+      color: 'rose',
+      unit: '회',
+      note: speech.fillerTypes.length ? speech.fillerTypes.join(', ') : undefined,
+    },
+    {
+      label: '답변 지연',
+      value: speech.answerDelaySec === null ? null : Math.round(speech.answerDelaySec * 10) / 10,
+      color: 'sky',
+      unit: '초',
+    },
+  ]
+
+  // Real-time feedback: posture (client, immediate) + speech (from backend)
+  const feedbackItems = [
+    ...(metrics ? postureFeedback(metrics) : []),
+    ...speechFeedback,
+  ]
 
   return (
     <div className="flex h-screen w-full flex-col bg-[#0b0f19] text-slate-100">
@@ -165,8 +193,11 @@ export function InterviewRoomPage() {
         {/* Right side bar — practice mode only */}
         {!isReal && (
           <aside className="hidden w-[340px] shrink-0 flex-col gap-5 overflow-y-auto border-l border-white/10 bg-white px-5 py-5 text-[var(--color-fg)] lg:flex">
-            <SidePanelSection title="실시간 피드백" badge="4 new">
-              <RealtimeFeedbackPanel />
+            <SidePanelSection
+              title="실시간 피드백"
+              badge={feedbackItems.length ? `${feedbackItems.length}` : undefined}
+            >
+              <RealtimeFeedbackPanel items={feedbackItems} />
             </SidePanelSection>
             <SidePanelSection title="실시간 점수" badge={metrics ? 'LIVE' : undefined}>
               <LiveScoreGrid scores={liveScores} />

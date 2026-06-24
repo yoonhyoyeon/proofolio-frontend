@@ -36,7 +36,13 @@ export type LiveMetrics = {
   posture: number
   /** Low frame-to-frame movement (steady, not fidgeting) */
   stability: number
-  /** Weighted blend of the three above */
+  /** Purposeful hand gestures vs. distracting movements (face-touching, fidgeting) */
+  gesture: number
+  /** Cumulative count of head-down events this session */
+  headDownCount: number
+  /** Cumulative count of abnormal hand raises (wrist above shoulders) this session */
+  handRaiseCount: number
+  /** Weighted blend of the score metrics above */
   confidence: number
   faceFound: boolean
   poseFound: boolean
@@ -79,6 +85,68 @@ function computePosture(p: NormalizedLandmark[]): number {
   return clamp(100 - tilt * 180 - lean * 120)
 }
 
+/** Head pitch from face landmarks (>0 = looking down). */
+function headPitch(f: NormalizedLandmark[]): number {
+  const nose = f[1]
+  const forehead = f[10]
+  const chin = f[152]
+  if (!nose || !forehead || !chin) return 0
+  const faceH = chin.y - forehead.y || 1e-3
+  return (nose.y - forehead.y) / faceH - 0.55
+}
+
+const isVisible = (lm?: NormalizedLandmark): lm is NormalizedLandmark =>
+  !!lm &&
+  (lm.visibility === undefined || lm.visibility > 0.5) &&
+  lm.x > 0 && lm.x < 1 && lm.y > 0 && lm.y < 1
+
+/**
+ * Hand-gesture appropriateness from pose wrists.
+ *
+ * Rewards purposeful gestures in the natural "gesture zone" in front of the
+ * torso; penalizes distracting movements — touching the face/hair and frantic
+ * fidgeting (high `handMove`). `handMove` is the EMA of wrist speed in
+ * shoulder-width units, computed by the caller across frames.
+ */
+function computeGesture(
+  p: NormalizedLandmark[],
+  handMove: number,
+): { score: number; handsVisible: boolean } {
+  const nose = p[0]
+  const lShoulder = p[11]
+  const rShoulder = p[12]
+  if (!nose || !lShoulder || !rShoulder) return { score: 60, handsVisible: false }
+
+  const shoulderW = Math.hypot(rShoulder.x - lShoulder.x, rShoulder.y - lShoulder.y) || 1e-3
+  const shoulderY = (lShoulder.y + rShoulder.y) / 2
+  const midX = (lShoulder.x + rShoulder.x) / 2
+
+  const wrists = [p[15], p[16]].filter(isVisible)
+  // Hands resting / out of frame → neutral, don't penalize
+  if (wrists.length === 0) return { score: 62, handsVisible: false }
+
+  // Distracting: a wrist near the head (face / hair touching)
+  const faceTouch = wrists.some(
+    (w) => Math.hypot(w.x - nose.x, w.y - nose.y) < shoulderW * 0.75,
+  )
+  // Purposeful: hands in front of the torso, below shoulders, not too low/wide
+  const inZone = wrists.some(
+    (w) =>
+      w.y > shoulderY - shoulderW * 0.2 &&
+      w.y < shoulderY + shoulderW * 1.8 &&
+      Math.abs(w.x - midX) < shoulderW * 1.3,
+  )
+
+  let score = 78
+  if (faceTouch) score -= 45
+  if (!inZone) score -= 12
+  if (handMove > 0.12) score -= 35 // frantic / fidgety
+  else if (handMove > 0.07) score -= 15 // a bit excessive
+  else if (handMove >= 0.015) score += 6 // healthy, expressive gesturing
+
+  return { score: clamp(score), handsVisible: true }
+}
+
 /**
  * Draws a live MediaPipe face mesh and/or pose skeleton on a canvas overlaid
  * on top of an existing <video> element, and reports simple interview metrics
@@ -113,9 +181,16 @@ export function PoseMeshOverlay({
   const faceResultRef = useRef<NormalizedLandmark[] | null>(null)
   const poseResultRef = useRef<NormalizedLandmark[] | null>(null)
   // EMA-smoothed scores + movement tracking
-  const scoreRef = useRef({ gaze: 65, posture: 65, stability: 70 })
+  const scoreRef = useRef({ gaze: 65, posture: 65, stability: 70, gesture: 70 })
   const prevNoseRef = useRef<{ x: number; y: number } | null>(null)
   const moveRef = useRef(0)
+  // Wrist tracking for hand-gesture analysis
+  const prevWristRef = useRef<{ lx: number; ly: number; rx: number; ry: number } | null>(null)
+  const handMoveRef = useRef(0)
+  // Cumulative event counters + edge-detection state (with hysteresis)
+  const countRef = useRef({ headDown: 0, handRaise: 0 })
+  const headDownStateRef = useRef(false)
+  const handRaiseStateRef = useRef(false)
 
   // Keep latest props available to the rAF loop without re-creating it
   const layersRef = useRef(layers)
@@ -212,13 +287,69 @@ export function PoseMeshOverlay({
       }
       s.stability = ema(s.stability, clamp(100 - moveRef.current * 3500))
 
+      // Hand-gesture appropriateness (wrist speed → handMove, then heuristic)
+      if (poseLm) {
+        const ls = poseLm[11]
+        const rs = poseLm[12]
+        const lw = poseLm[15]
+        const rw = poseLm[16]
+        const shoulderW =
+          ls && rs ? Math.hypot(rs.x - ls.x, rs.y - ls.y) || 1e-3 : 1e-3
+        const prev = prevWristRef.current
+        if (prev && lw && rw) {
+          const dl = Math.hypot(lw.x - prev.lx, lw.y - prev.ly)
+          const dr = Math.hypot(rw.x - prev.rx, rw.y - prev.ry)
+          handMoveRef.current = ema(handMoveRef.current, (dl + dr) / 2 / shoulderW, 0.3)
+        }
+        if (lw && rw) {
+          prevWristRef.current = { lx: lw.x, ly: lw.y, rx: rw.x, ry: rw.y }
+        }
+        s.gesture = ema(s.gesture, computeGesture(poseLm, handMoveRef.current).score)
+      } else {
+        s.gesture = ema(s.gesture, 60)
+      }
+
+      // Head-down events (edge-triggered, with hysteresis)
+      if (faceLm) {
+        const pitch = headPitch(faceLm)
+        if (!headDownStateRef.current && pitch > 0.16) {
+          headDownStateRef.current = true
+          countRef.current.headDown += 1
+        } else if (headDownStateRef.current && pitch < 0.08) {
+          headDownStateRef.current = false
+        }
+      }
+
+      // Abnormal hand raises — wrist above the shoulder line (edge-triggered)
+      if (poseLm) {
+        const ls = poseLm[11]
+        const rs = poseLm[12]
+        if (ls && rs) {
+          const shoulderY = (ls.y + rs.y) / 2
+          const sw = Math.hypot(rs.x - ls.x, rs.y - ls.y) || 1e-3
+          const raised = [poseLm[15], poseLm[16]]
+            .filter(isVisible)
+            .some((w) => w.y < shoulderY - sw * 0.1)
+          if (!handRaiseStateRef.current && raised) {
+            handRaiseStateRef.current = true
+            countRef.current.handRaise += 1
+          } else if (handRaiseStateRef.current && !raised) {
+            handRaiseStateRef.current = false
+          }
+        }
+      }
+
       if (now - lastEmitRef.current >= EMIT_INTERVAL) {
         lastEmitRef.current = now
-        const confidence = s.gaze * 0.4 + s.posture * 0.35 + s.stability * 0.25
+        const confidence =
+          s.gaze * 0.35 + s.posture * 0.3 + s.stability * 0.15 + s.gesture * 0.2
         onMetricsRef.current?.({
           gaze: s.gaze,
           posture: s.posture,
           stability: s.stability,
+          gesture: s.gesture,
+          headDownCount: countRef.current.headDown,
+          handRaiseCount: countRef.current.handRaise,
           confidence,
           faceFound: !!faceLm,
           poseFound: !!poseLm,
