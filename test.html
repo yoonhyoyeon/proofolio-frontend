@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Panel Interview WebSocket Demo</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 24px;
+        line-height: 1.5;
+      }
+
+      label,
+      button {
+        display: block;
+        margin-top: 12px;
+      }
+
+      input,
+      textarea {
+        box-sizing: border-box;
+        width: 100%;
+        max-width: 720px;
+        padding: 8px;
+      }
+
+      textarea {
+        min-height: 96px;
+      }
+
+      button {
+        padding: 8px 12px;
+      }
+
+      video,
+      canvas {
+        display: block;
+        margin-top: 16px;
+        max-width: 360px;
+        width: 100%;
+        background: #eee;
+      }
+
+      pre {
+        max-height: 360px;
+        overflow: auto;
+        padding: 12px;
+        background: #f5f5f5;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Panel Interview WebSocket Demo</h1>
+
+      <label>
+        Backend URL
+        <input id="backendUrl" value="http://localhost:3000" />
+      </label>
+
+      <label>
+        Session ID
+        <input id="sessionId" placeholder="InterviewSession id" />
+      </label>
+
+      <label>
+        Portfolio ID
+        <input id="portfolioId" placeholder="Portfolio id" />
+      </label>
+
+      <label>
+        Session Token
+        <input id="token" placeholder="Bearer token value without the Bearer prefix" />
+      </label>
+
+      <button id="previewButton" type="button">Start camera and mic</button>
+      <button id="connectButton" type="button">Connect interview socket</button>
+      <button id="streamButton" type="button" disabled>Start streaming</button>
+      <button id="stopButton" type="button" disabled>Stop interview</button>
+
+      <label>
+        Transcript text
+        <textarea
+          id="transcriptText"
+          placeholder="STT text or manual transcript for Anthropic panel decisions"
+        ></textarea>
+      </label>
+
+      <button id="sendDeltaButton" type="button" disabled>Send transcript.delta</button>
+      <button id="sendFinalButton" type="button" disabled>Send transcript.final</button>
+
+      <video id="preview" autoplay muted playsinline></video>
+      <canvas id="frameCanvas" width="640" height="360"></canvas>
+
+      <h2>Transcript</h2>
+      <pre id="transcriptLog"></pre>
+
+      <h2>Panel</h2>
+      <pre id="panelLog"></pre>
+
+      <h2>Events</h2>
+      <pre id="log"></pre>
+    </main>
+
+    <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+    <script>
+      const state = {
+        socket: null,
+        mediaStream: null,
+        mediaRecorder: null,
+        audioSequence: 0,
+        frameSequence: 0,
+        frameTimer: null,
+      };
+
+      const elements = {
+        backendUrl: document.querySelector('#backendUrl'),
+        sessionId: document.querySelector('#sessionId'),
+        portfolioId: document.querySelector('#portfolioId'),
+        token: document.querySelector('#token'),
+        preview: document.querySelector('#preview'),
+        frameCanvas: document.querySelector('#frameCanvas'),
+        previewButton: document.querySelector('#previewButton'),
+        connectButton: document.querySelector('#connectButton'),
+        streamButton: document.querySelector('#streamButton'),
+        stopButton: document.querySelector('#stopButton'),
+        transcriptText: document.querySelector('#transcriptText'),
+        sendDeltaButton: document.querySelector('#sendDeltaButton'),
+        sendFinalButton: document.querySelector('#sendFinalButton'),
+        transcriptLog: document.querySelector('#transcriptLog'),
+        panelLog: document.querySelector('#panelLog'),
+        log: document.querySelector('#log'),
+      };
+
+      function logEvent(label, payload) {
+        const line = `[${new Date().toISOString()}] ${label} ${JSON.stringify(payload)}\n`;
+        elements.log.textContent = line + elements.log.textContent;
+      }
+
+      function showTranscript(event) {
+        elements.transcriptLog.textContent = `[${event.type}]\n${event.transcript}`;
+      }
+
+      function showPanelEvent(event) {
+        const line = `[${event.type}] ${event.interviewerKey} priority=${event.priority}\n${event.message}\nreason: ${event.reason}\n\n`;
+        elements.panelLog.textContent = line + elements.panelLog.textContent;
+      }
+
+      function requiredValue(input, name) {
+        const value = input.value.trim();
+        if (!value) {
+          throw new Error(`${name} is required`);
+        }
+        return value;
+      }
+
+      async function blobToBase64(blob) {
+        const buffer = await blob.arrayBuffer();
+        let binary = '';
+        const bytes = new Uint8Array(buffer);
+        for (const byte of bytes) {
+          binary += String.fromCharCode(byte);
+        }
+        return btoa(binary);
+      }
+
+      async function startPreview() {
+        state.mediaStream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: { width: 640, height: 360 },
+        });
+        elements.preview.srcObject = state.mediaStream;
+        logEvent('preview.started', {
+          audioTracks: state.mediaStream.getAudioTracks().length,
+          videoTracks: state.mediaStream.getVideoTracks().length,
+        });
+      }
+
+      function connectSocket() {
+        const backendUrl = requiredValue(elements.backendUrl, 'Backend URL');
+        const sessionId = requiredValue(elements.sessionId, 'Session ID');
+        const portfolioId = requiredValue(elements.portfolioId, 'Portfolio ID');
+        const token = requiredValue(elements.token, 'Session Token');
+
+        state.socket = io(`${backendUrl}/interviews`, {
+          auth: { token },
+          query: { sessionId },
+          transports: ['websocket'],
+        });
+
+        state.socket.on('connect', () => {
+          logEvent('socket.connected', { socketId: state.socket.id });
+          state.socket.emit('event', { type: 'session.start', portfolioId });
+          elements.streamButton.disabled = false;
+          elements.stopButton.disabled = false;
+          elements.sendDeltaButton.disabled = false;
+          elements.sendFinalButton.disabled = false;
+        });
+
+        state.socket.on('event', (event) => {
+          logEvent('server.event', event);
+          if (event.type === 'transcript.delta' || event.type === 'transcript.final') {
+            showTranscript(event);
+          }
+          if (
+            event.type === 'panel.message' ||
+            event.type === 'panel.interrupt' ||
+            event.type === 'panel.evaluation'
+          ) {
+            showPanelEvent(event);
+          }
+          if (event.type === 'panel.interrupt') {
+            stopAudioRecorder();
+          }
+        });
+
+        state.socket.on('connect_error', (error) => {
+          logEvent('socket.error', { message: error.message });
+        });
+
+        state.socket.on('disconnect', (reason) => {
+          logEvent('socket.disconnected', { reason });
+          stopStreaming();
+        });
+      }
+
+      function startStreaming() {
+        if (!state.socket?.connected) {
+          throw new Error('Socket is not connected');
+        }
+        if (!state.mediaStream) {
+          throw new Error('Camera and mic preview is not started');
+        }
+
+        state.socket.emit('event', { type: 'user.speaking.start' });
+        startAudioRecorder();
+        startFrameCapture();
+        elements.streamButton.disabled = true;
+        logEvent('stream.started', {});
+      }
+
+      function sendTranscript(type) {
+        if (!state.socket?.connected) {
+          throw new Error('Socket is not connected');
+        }
+        const transcript = requiredValue(elements.transcriptText, 'Transcript text');
+        state.socket.emit('event', { type, transcript });
+        logEvent('client.event', { type, transcript });
+      }
+
+      function startAudioRecorder() {
+        state.mediaRecorder = new MediaRecorder(state.mediaStream, {
+          mimeType: preferredAudioMimeType(),
+        });
+        state.mediaRecorder.ondataavailable = async (event) => {
+          if (event.data.size === 0 || !state.socket?.connected) {
+            return;
+          }
+          state.socket.emit('event', {
+            type: 'media.audio',
+            sequence: state.audioSequence,
+            mimeType: event.data.type || 'audio/webm',
+            dataBase64: await blobToBase64(event.data),
+          });
+          state.audioSequence += 1;
+        };
+        state.mediaRecorder.start(1000);
+      }
+
+      function startFrameCapture() {
+        const context = elements.frameCanvas.getContext('2d');
+        state.frameTimer = window.setInterval(() => {
+          if (!context || !state.socket?.connected) {
+            return;
+          }
+          context.drawImage(
+            elements.preview,
+            0,
+            0,
+            elements.frameCanvas.width,
+            elements.frameCanvas.height,
+          );
+          elements.frameCanvas.toBlob(async (blob) => {
+            if (!blob || !state.socket?.connected) {
+              return;
+            }
+            state.socket.emit('event', {
+              type: 'media.frame',
+              sequence: state.frameSequence,
+              mimeType: 'image/jpeg',
+              dataBase64: await blobToBase64(blob),
+            });
+            state.frameSequence += 1;
+          }, 'image/jpeg');
+        }, 1000);
+      }
+
+      function preferredAudioMimeType() {
+        if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+          return 'audio/webm;codecs=opus';
+        }
+        return 'audio/webm';
+      }
+
+      function stopAudioRecorder() {
+        if (state.mediaRecorder && state.mediaRecorder.state !== 'inactive') {
+          state.mediaRecorder.stop();
+        }
+        state.mediaRecorder = null;
+      }
+
+      function stopStreaming() {
+        stopAudioRecorder();
+        if (state.frameTimer) {
+          clearInterval(state.frameTimer);
+          state.frameTimer = null;
+        }
+        elements.streamButton.disabled = !state.socket?.connected;
+      }
+
+      function stopInterview() {
+        stopStreaming();
+        if (state.socket?.connected) {
+          state.socket.emit('event', { type: 'user.speaking.end' });
+          state.socket.emit('event', { type: 'session.end' });
+          state.socket.disconnect();
+        }
+        for (const track of state.mediaStream?.getTracks() ?? []) {
+          track.stop();
+        }
+        state.mediaStream = null;
+        elements.stopButton.disabled = true;
+        elements.streamButton.disabled = true;
+        elements.sendDeltaButton.disabled = true;
+        elements.sendFinalButton.disabled = true;
+        logEvent('interview.stopped', {});
+      }
+
+      function bind(button, action) {
+        button.addEventListener('click', () => {
+          Promise.resolve()
+            .then(action)
+            .catch((error) => {
+              logEvent('client.error', { message: error.message });
+            });
+        });
+      }
+
+      bind(elements.previewButton, startPreview);
+      bind(elements.connectButton, connectSocket);
+      bind(elements.streamButton, startStreaming);
+      bind(elements.stopButton, stopInterview);
+      bind(elements.sendDeltaButton, () => sendTranscript('transcript.delta'));
+      bind(elements.sendFinalButton, () => sendTranscript('transcript.final'));
+    </script>
+  </body>
+</html>
