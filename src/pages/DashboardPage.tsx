@@ -29,7 +29,7 @@ import {
 export function DashboardPage() {
   const [sessions, setSessions] = useState<InterviewSession[]>([])
   const [loading, setLoading] = useState(true)
-  const username = localStorage.getItem(GITHUB_USERNAME_KEY) ?? '사용자'
+  const username = localStorage.getItem(GITHUB_USERNAME_KEY) ?? 'Yoonhyoyeon'
 
   useEffect(() => {
     const token = localStorage.getItem(GITHUB_TOKEN_KEY) ?? ''

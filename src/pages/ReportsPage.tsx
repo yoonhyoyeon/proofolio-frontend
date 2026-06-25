@@ -95,7 +95,7 @@ export function ReportsPage() {
                       </Badge>
                     </td>
                     <td className="py-4 pr-4">
-                      <ScorePill score={s.finalScore} />
+                      <ScorePill score={s.finalScore ?? 0} />
                     </td>
                     <td className="py-4 pr-6">
                       <ChevronRight className="h-4 w-4 text-[var(--color-fg-subtle)] transition-transform group-hover:translate-x-0.5" />

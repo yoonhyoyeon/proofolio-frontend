@@ -26,7 +26,7 @@ import { RealtimeFeedbackPanel } from '@/components/domain/RealtimeFeedbackPanel
 import { LiveScoreGrid, type LiveScoreItem } from '@/components/domain/LiveScoreGrid'
 import { LiveWaveGraph } from '@/components/domain/LiveWaveGraph'
 import { interviewers, interviewMeta, currentUser } from '@/lib/mock'
-import { initInterviewSocket, getInterviewSocket, disconnectInterviewSocket, type InterviewInterviewer } from '@/lib/interviewSocket'
+import { initInterviewSocket, getInterviewSocket, disconnectInterviewSocket, type InterviewInterviewer, type InterviewQuestion } from '@/lib/interviewSocket'
 import { useInterviewAudio, type ConnectionStatus } from '@/hooks/useInterviewAudio'
 import { submitAttitude, submitSpeechMetrics, getInterviewList, GITHUB_TOKEN_KEY } from '@/lib/api'
 import { useInterviewerTTS } from '@/hooks/useInterviewerTTS'
@@ -56,8 +56,6 @@ export function InterviewRoomPage() {
     sessionNo?: string | number
   } | null
   const sessionId = locationState?.sessionId ?? ''
-  const portfolioId = locationState?.portfolioId ?? ''
-  const sessionNo = String(locationState?.sessionNo ?? '')
 
   // Attach listeners to the socket that was already connected in DeviceCheckPage.
   // Do NOT call initInterviewSocket here — that would disconnect the live session.

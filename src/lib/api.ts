@@ -63,6 +63,11 @@ export type PortfolioSummary = {
   title: string
   status: string
   updatedAt?: string
+  slug?: string
+  description?: string
+  projectsCount?: number
+  views?: number
+  theme?: string
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
