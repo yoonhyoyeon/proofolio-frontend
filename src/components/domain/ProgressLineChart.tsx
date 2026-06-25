@@ -7,14 +7,15 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { scoreHistory } from '@/lib/mock'
 
-export function ProgressLineChart() {
+export type ChartPoint = { label: string; score: number }
+
+export function ProgressLineChart({ data }: { data: ChartPoint[] }) {
   return (
     <div className="h-[260px] w-full">
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart
-          data={scoreHistory}
+          data={data}
           margin={{ top: 10, right: 16, left: -12, bottom: 0 }}
         >
           <defs>

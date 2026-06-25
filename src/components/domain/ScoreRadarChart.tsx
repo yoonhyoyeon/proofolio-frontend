@@ -6,13 +6,14 @@ import {
   RadarChart,
   ResponsiveContainer,
 } from 'recharts'
-import { categoryScores } from '@/lib/mock'
 
-export function ScoreRadarChart() {
+export type RadarItem = { axis: string; value: number }
+
+export function ScoreRadarChart({ data }: { data: RadarItem[] }) {
   return (
     <div className="h-[320px] w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <RadarChart data={categoryScores} outerRadius="78%">
+        <RadarChart data={data} outerRadius="78%">
           <PolarGrid stroke="#E2E8F0" />
           <PolarAngleAxis
             dataKey="axis"

@@ -1,9 +1,10 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   AlertTriangle,
   ArrowLeft,
   ChevronDown,
+  Loader2,
   Mic,
   MicOff,
   Sparkles,
@@ -14,13 +15,20 @@ import { cn } from '@/lib/cn'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { currentUser } from '@/lib/mock'
+import {
+  initInterviewSocket,
+  type InterviewQuestion,
+  type InterviewInterviewer,
+  type SessionStartedPayload,
+} from '@/lib/interviewSocket'
 
 const MIC_BARS = [2, 4, 6, 9, 12, 16, 20, 24, 20, 16, 12, 9, 6, 4, 2]
 
 export function InterviewDeviceCheckPage() {
   const [params] = useSearchParams()
-  const mode: 'practice' | 'real' =
-    params.get('mode') === 'real' ? 'real' : 'practice'
+  const mode: 'practice' | 'real' = params.get('mode') === 'real' ? 'real' : 'practice'
+  const portfolioId = params.get('portfolioId') ?? ''
+  const sessionNo = params.get('sessionNo') ?? String(Math.floor(Math.random() * 1_000_000))
   const navigate = useNavigate()
 
   const [cameras, setCameras] = useState<MediaDeviceInfo[]>([])
@@ -33,11 +41,14 @@ export function InterviewDeviceCheckPage() {
   const [permissionError, setPermissionError] = useState<string | null>(null)
   const [ready, setReady] = useState(false)
 
+  // Socket / waiting state
+  const [connecting, setConnecting] = useState(false)
+  const [connectError, setConnectError] = useState('')
+
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const audioCtxRef = useRef<AudioContext | null>(null)
   const rafRef = useRef<number>(0)
-  // Refs so setupStream always reads current toggle states without deps
   const camOnRef = useRef(true)
   const micOnRef = useRef(true)
 
@@ -67,7 +78,7 @@ export function InterviewDeviceCheckPage() {
       }
       rafRef.current = requestAnimationFrame(tick)
     } catch {
-      // AudioContext unavailable (e.g. SSR / sandboxed iframe)
+      // AudioContext unavailable
     }
   }
 
@@ -78,22 +89,20 @@ export function InterviewDeviceCheckPage() {
         audio: micId ? { deviceId: { exact: micId } } : true,
       })
 
-      streamRef.current?.getTracks().forEach(t => t.stop())
+      streamRef.current?.getTracks().forEach((t) => t.stop())
       streamRef.current = stream
 
-      // Apply current toggle state to the new stream
-      stream.getVideoTracks().forEach(t => { t.enabled = camOnRef.current })
-      stream.getAudioTracks().forEach(t => { t.enabled = micOnRef.current })
+      stream.getVideoTracks().forEach((t) => { t.enabled = camOnRef.current })
+      stream.getAudioTracks().forEach((t) => { t.enabled = micOnRef.current })
 
       if (videoRef.current) videoRef.current.srcObject = stream
 
       setReady(true)
       setPermissionError(null)
 
-      // Enumerate after permission grant so device labels are available
       const devices = await navigator.mediaDevices.enumerateDevices()
-      const videoDevices = devices.filter(d => d.kind === 'videoinput')
-      const audioDevices = devices.filter(d => d.kind === 'audioinput')
+      const videoDevices = devices.filter((d) => d.kind === 'videoinput')
+      const audioDevices = devices.filter((d) => d.kind === 'audioinput')
       setCameras(videoDevices)
       setMics(audioDevices)
       if (!cameraId && videoDevices[0]) setSelectedCamera(videoDevices[0].deviceId)
@@ -110,7 +119,7 @@ export function InterviewDeviceCheckPage() {
   useEffect(() => {
     void setupStream()
     return () => {
-      streamRef.current?.getTracks().forEach(t => t.stop())
+      streamRef.current?.getTracks().forEach((t) => t.stop())
       stopMicPoll()
     }
   }, [])
@@ -119,14 +128,14 @@ export function InterviewDeviceCheckPage() {
     const next = !camOn
     camOnRef.current = next
     setCamOn(next)
-    streamRef.current?.getVideoTracks().forEach(t => { t.enabled = next })
+    streamRef.current?.getVideoTracks().forEach((t) => { t.enabled = next })
   }
 
   function handleMicToggle() {
     const next = !micOn
     micOnRef.current = next
     setMicOn(next)
-    streamRef.current?.getAudioTracks().forEach(t => { t.enabled = next })
+    streamRef.current?.getAudioTracks().forEach((t) => { t.enabled = next })
   }
 
   function handleCameraChange(deviceId: string) {
@@ -139,15 +148,107 @@ export function InterviewDeviceCheckPage() {
     void setupStream(selectedCamera || undefined, deviceId)
   }
 
+  const handleEnter = useCallback(() => {
+    if (!portfolioId) {
+      setConnectError('포트폴리오 ID가 없습니다. 설정 페이지로 돌아가 다시 시도해 주세요.')
+      return
+    }
+    setConnecting(true)
+    setConnectError('')
+
+    const socket = initInterviewSocket({ portfolioId, sessionNo })
+
+    const cleanup = () => {
+      socket.off('connect')
+      socket.off('event')
+      socket.off('connect_error')
+    }
+
+    socket.on('connect', () => {
+      socket.emit('event', { type: 'session.start', portfolioId })
+    })
+
+    socket.on('event', (payload: { type: string } & Partial<SessionStartedPayload>) => {
+      if (payload.type !== 'session.started') return
+      cleanup()
+      const questions: InterviewQuestion[] = payload.questions ?? []
+      const interviewers: InterviewInterviewer[] = payload.interviewers ?? []
+      const sessionId: string = payload.sessionId ?? ''
+      navigate(`/interview/room?mode=${mode}`, {
+        state: { questions, interviewers, sessionId, portfolioId, sessionNo },
+        replace: true,
+      })
+    })
+
+    socket.on('connect_error', (err: Error) => {
+      cleanup()
+      setConnectError(`연결 실패: ${err.message}`)
+      setConnecting(false)
+    })
+  }, [portfolioId, sessionNo, mode, navigate])
+
   const barsLit = micOn ? micLevel : 0
 
-  const cameraOptions = cameras.length > 0
-    ? cameras.map((d, i) => ({ value: d.deviceId, label: d.label || `카메라 ${i + 1}` }))
-    : [{ value: '', label: '장치를 불러오는 중...' }]
+  const cameraOptions =
+    cameras.length > 0
+      ? cameras.map((d, i) => ({ value: d.deviceId, label: d.label || `카메라 ${i + 1}` }))
+      : [{ value: '', label: '장치를 불러오는 중...' }]
 
-  const micOptions = mics.length > 0
-    ? mics.map((d, i) => ({ value: d.deviceId, label: d.label || `마이크 ${i + 1}` }))
-    : [{ value: '', label: '장치를 불러오는 중...' }]
+  const micOptions =
+    mics.length > 0
+      ? mics.map((d, i) => ({ value: d.deviceId, label: d.label || `마이크 ${i + 1}` }))
+      : [{ value: '', label: '장치를 불러오는 중...' }]
+
+  // Loading overlay while waiting for session.started
+  if (connecting) {
+    return (
+      <div className="flex h-screen w-full flex-col bg-[#0b0f19] text-slate-100">
+        <header className="flex items-center justify-between border-b border-white/10 bg-[#0b0f19]/95 px-6 py-3">
+          <Link
+            to="/"
+            className="flex items-center gap-2 text-sm font-bold tracking-tight text-white"
+          >
+            <span className="grid h-7 w-7 place-items-center rounded-[8px] bg-gradient-to-br from-indigo-500 to-violet-500 text-white">
+              <Sparkles className="h-3.5 w-3.5" />
+            </span>
+            Proofolio
+          </Link>
+          <Badge tone="dark" className="border-indigo-500/30 bg-indigo-500/15 text-indigo-300">
+            {mode === 'real' ? '실전 모드' : '연습 모드'}
+          </Badge>
+        </header>
+
+        <div className="flex flex-1 flex-col items-center justify-center gap-6">
+          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-indigo-500/15">
+            <Loader2 className="h-10 w-10 animate-spin text-indigo-400" />
+          </div>
+          <div className="text-center">
+            <p className="text-lg font-bold text-white">AI 면접관이 질문을 준비 중입니다</p>
+            <p className="mt-2 text-sm text-slate-400">
+              포트폴리오를 분석하여 맞춤 질문을 생성하고 있습니다. 잠시만 기다려 주세요.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs text-slate-400">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-indigo-400" />
+            소켓 연결 중 · 약 18초 소요
+          </div>
+          {connectError && (
+            <div className="flex flex-col items-center gap-3">
+              <p className="text-sm text-rose-400">{connectError}</p>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-slate-400 hover:text-white"
+                onClick={() => setConnecting(false)}
+              >
+                돌아가기
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex h-screen w-full flex-col bg-[#0b0f19] text-slate-100">
@@ -192,7 +293,6 @@ export function InterviewDeviceCheckPage() {
               </div>
             ) : (
               <>
-                {/* Live camera feed — always rendered so srcObject assignment works */}
                 <video
                   ref={videoRef}
                   autoPlay
@@ -204,7 +304,6 @@ export function InterviewDeviceCheckPage() {
                   )}
                 />
 
-                {/* Camera-off overlay */}
                 {(!camOn || !ready) && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-slate-500">
                     {!ready ? (
@@ -218,15 +317,11 @@ export function InterviewDeviceCheckPage() {
                   </div>
                 )}
 
-                {/* HUD overlays */}
                 {camOn && ready && (
                   <>
                     <div className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-md bg-black/65 px-2.5 py-1 text-xs font-medium text-white backdrop-blur">
                       <Mic
-                        className={cn(
-                          'h-3.5 w-3.5',
-                          micOn ? 'text-emerald-400' : 'text-rose-400',
-                        )}
+                        className={cn('h-3.5 w-3.5', micOn ? 'text-emerald-400' : 'text-rose-400')}
                       />
                       {currentUser.name}
                       <span className="ml-1 text-[11px] text-slate-400">(나)</span>
@@ -245,21 +340,13 @@ export function InterviewDeviceCheckPage() {
             <ToggleButton
               active={camOn}
               onToggle={handleCamToggle}
-              icon={
-                camOn
-                  ? <Video className="h-[18px] w-[18px]" />
-                  : <VideoOff className="h-[18px] w-[18px]" />
-              }
+              icon={camOn ? <Video className="h-[18px] w-[18px]" /> : <VideoOff className="h-[18px] w-[18px]" />}
               label={camOn ? '카메라 끄기' : '카메라 켜기'}
             />
             <ToggleButton
               active={micOn}
               onToggle={handleMicToggle}
-              icon={
-                micOn
-                  ? <Mic className="h-[18px] w-[18px]" />
-                  : <MicOff className="h-[18px] w-[18px]" />
-              }
+              icon={micOn ? <Mic className="h-[18px] w-[18px]" /> : <MicOff className="h-[18px] w-[18px]" />}
               label={micOn ? '마이크 끄기' : '마이크 켜기'}
             />
           </div>
@@ -271,15 +358,12 @@ export function InterviewDeviceCheckPage() {
         {/* Device settings panel */}
         <div className="flex w-full max-w-[380px] flex-col gap-6">
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-white">
-              장치 설정
-            </h1>
+            <h1 className="text-xl font-bold tracking-tight text-white">장치 설정</h1>
             <p className="mt-1 text-sm text-slate-400">
               면접 전에 카메라와 마이크를 확인하세요.
             </p>
           </div>
 
-          {/* Camera select */}
           <DeviceSelect
             label="카메라"
             icon={<Video className="h-4 w-4" />}
@@ -288,7 +372,6 @@ export function InterviewDeviceCheckPage() {
             onChange={handleCameraChange}
           />
 
-          {/* Mic select + level */}
           <div className="flex flex-col gap-3">
             <DeviceSelect
               label="마이크"
@@ -298,7 +381,6 @@ export function InterviewDeviceCheckPage() {
               onChange={handleMicChange}
             />
 
-            {/* Mic level indicator */}
             <div className="rounded-[var(--radius-md)] border border-white/10 bg-slate-900/60 px-4 py-3">
               <div className="flex items-center justify-between">
                 <p className="text-[11px] font-medium text-slate-400">입력 레벨</p>
@@ -332,12 +414,16 @@ export function InterviewDeviceCheckPage() {
             </div>
           </div>
 
-          {/* CTA */}
+          {connectError && (
+            <p className="text-xs text-rose-400">{connectError}</p>
+          )}
+
           <div className="flex flex-col gap-2 pt-2">
             <Button
               size="xl"
               className="w-full bg-gradient-to-r from-indigo-500 to-violet-600 text-white shadow-[0_6px_20px_rgba(99,102,241,0.4)] hover:from-indigo-600 hover:to-violet-700"
-              onClick={() => navigate(`/interview/room?mode=${mode}`)}
+              onClick={handleEnter}
+              disabled={!ready}
             >
               <Sparkles className="h-4 w-4" />
               면접 입장하기

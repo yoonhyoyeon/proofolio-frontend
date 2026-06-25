@@ -1,16 +1,38 @@
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowUpDown, ChevronRight, Search } from 'lucide-react'
+import { ChevronRight, Loader2 } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Card } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Select } from '@/components/ui/select'
-import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ScorePill } from '@/components/domain/ScorePill'
-import { reportList } from '@/lib/mock'
+import { getInterviewList, GITHUB_TOKEN_KEY, type InterviewSession } from '@/lib/api'
+
+function formatDate(iso: string): string {
+  return iso.slice(0, 10).replace(/-/g, '.')
+}
+
+function formatDuration(start: string, end: string | null): string {
+  if (!end) return '-'
+  const ms = new Date(end).getTime() - new Date(start).getTime()
+  const min = Math.floor(ms / 60000)
+  const sec = Math.floor((ms % 60000) / 1000)
+  return `${min}분 ${sec}초`
+}
 
 export function ReportsPage() {
   const navigate = useNavigate()
+  const [sessions, setSessions] = useState<InterviewSession[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    const token = localStorage.getItem(GITHUB_TOKEN_KEY) ?? ''
+    getInterviewList(token)
+      .then(setSessions)
+      .catch(() => setError('면접 리포트를 불러오지 못했습니다.'))
+      .finally(() => setLoading(false))
+  }, [])
+
   return (
     <>
       <PageHeader
@@ -19,85 +41,77 @@ export function ReportsPage() {
       />
 
       <Card className="overflow-hidden">
-        <div className="flex flex-col gap-3 border-b border-[var(--color-border)] p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="relative w-full max-w-xs">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-fg-subtle)]" />
-            <Input
-              placeholder="면접 제목으로 검색"
-              className="pl-9"
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <Select defaultValue="all" className="h-9 w-[140px]">
-              <option value="all">전체 직무</option>
-              <option value="frontend">프론트엔드</option>
-              <option value="backend">백엔드</option>
-              <option value="fullstack">풀스택</option>
-              <option value="ai">AI 엔지니어</option>
-              <option value="designer">디자이너</option>
-              <option value="pm">PM</option>
-            </Select>
-            <Button variant="outline" size="sm" className="gap-1.5">
-              <ArrowUpDown className="h-3.5 w-3.5" />
-              최신순
-            </Button>
-          </div>
-        </div>
-
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-[var(--color-border)] text-left text-xs font-medium text-[var(--color-fg-muted)]">
-                <th className="px-6 py-3">면접 제목</th>
-                <th className="py-3 pr-4">직무</th>
-                <th className="py-3 pr-4">날짜</th>
-                <th className="py-3 pr-4">모드</th>
-                <th className="py-3 pr-4">점수</th>
-                <th className="py-3 pr-6"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {reportList.map((row) => (
-                <tr
-                  key={row.id}
-                  onClick={() => navigate(`/interview/result/${row.id}`)}
-                  className="group cursor-pointer border-b border-[var(--color-border)] last:border-none hover:bg-[var(--color-surface)]"
-                >
-                  <td className="px-6 py-4">{row.title}</td>
-                  <td className="py-4 pr-4 text-[var(--color-fg-muted)]">
-                    {row.position}
-                  </td>
-                  <td className="py-4 pr-4 text-[var(--color-fg-muted)]">
-                    {row.date}
-                  </td>
-                  <td className="py-4 pr-4">
-                    <Badge tone={row.mode === 'real' ? 'dark' : 'brand'}>
-                      {row.mode === 'real' ? '실전' : '연습'}
-                    </Badge>
-                  </td>
-                  <td className="py-4 pr-4">
-                    <ScorePill score={row.score} />
-                  </td>
-                  <td className="py-4 pr-6">
-                    <ChevronRight className="h-4 w-4 text-[var(--color-fg-subtle)] transition-transform group-hover:translate-x-0.5" />
-                  </td>
+          {loading ? (
+            <div className="flex items-center justify-center gap-2 py-16 text-sm text-[var(--color-fg-muted)]">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              불러오는 중...
+            </div>
+          ) : error ? (
+            <p className="py-16 text-center text-sm text-rose-500">{error}</p>
+          ) : sessions.length === 0 ? (
+            <p className="py-16 text-center text-sm text-[var(--color-fg-muted)]">
+              진행한 면접이 없습니다.
+            </p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-[var(--color-border)] text-left text-xs font-medium text-[var(--color-fg-muted)]">
+                  <th className="px-6 py-3">세션 번호</th>
+                  <th className="py-3 pr-4">날짜</th>
+                  <th className="py-3 pr-4">소요 시간</th>
+                  <th className="py-3 pr-4">질문 수</th>
+                  <th className="py-3 pr-4">답변 수</th>
+                  <th className="py-3 pr-4">상태</th>
+                  <th className="py-3 pr-4">점수</th>
+                  <th className="py-3 pr-6"></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {sessions.map((s) => (
+                  <tr
+                    key={s.id}
+                    onClick={() => navigate(`/interview/result/${s.id}`)}
+                    className="group cursor-pointer border-b border-[var(--color-border)] last:border-none hover:bg-[var(--color-surface)]"
+                  >
+                    <td className="px-6 py-4 font-medium text-[var(--color-fg)]">
+                      #{s.sessionNo}
+                    </td>
+                    <td className="py-4 pr-4 text-[var(--color-fg-muted)]">
+                      {formatDate(s.createdAt)}
+                    </td>
+                    <td className="py-4 pr-4 text-[var(--color-fg-muted)]">
+                      {formatDuration(s.createdAt, s.endedAt)}
+                    </td>
+                    <td className="py-4 pr-4 text-[var(--color-fg-muted)]">
+                      {s._count.questions}개
+                    </td>
+                    <td className="py-4 pr-4 text-[var(--color-fg-muted)]">
+                      {s._count.answers}개
+                    </td>
+                    <td className="py-4 pr-4">
+                      <Badge tone={s.status === 'ENDED' ? 'outline' : 'brand'}>
+                        {s.status === 'ENDED' ? '종료' : '진행 중'}
+                      </Badge>
+                    </td>
+                    <td className="py-4 pr-4">
+                      <ScorePill score={s.finalScore} />
+                    </td>
+                    <td className="py-4 pr-6">
+                      <ChevronRight className="h-4 w-4 text-[var(--color-fg-subtle)] transition-transform group-hover:translate-x-0.5" />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
 
-        <div className="flex items-center justify-between px-6 py-4 text-xs text-[var(--color-fg-muted)]">
-          <span>총 {reportList.length}건 중 1–{reportList.length}건 표시</span>
-          <div className="flex items-center gap-1">
-            <Button variant="ghost" size="sm" disabled>
-              이전
-            </Button>
-            <Button variant="ghost" size="sm" disabled>
-              다음
-            </Button>
+        {!loading && !error && sessions.length > 0 && (
+          <div className="border-t border-[var(--color-border)] px-6 py-4 text-xs text-[var(--color-fg-muted)]">
+            총 {sessions.length}건
           </div>
-        </div>
+        )}
       </Card>
     </>
   )

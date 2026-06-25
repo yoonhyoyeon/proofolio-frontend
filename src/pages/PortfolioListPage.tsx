@@ -1,17 +1,30 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Eye,
   FileText,
   FolderKanban,
   Github,
+  Loader2,
   Sparkles,
 } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { myPortfolios } from '@/lib/mock'
+import { getPortfolioList, GITHUB_TOKEN_KEY, type PortfolioSummary } from '@/lib/api'
 
 export function PortfolioListPage() {
+  const [portfolios, setPortfolios] = useState<PortfolioSummary[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const token = localStorage.getItem(GITHUB_TOKEN_KEY) ?? ''
+    getPortfolioList(token)
+      .then(setPortfolios)
+      .catch(() => setPortfolios([]))
+      .finally(() => setLoading(false))
+  }, [])
+
   return (
     <>
       <PageHeader
@@ -59,24 +72,29 @@ export function PortfolioListPage() {
       </div>
 
       {/* Existing portfolios */}
-      {myPortfolios.length > 0 && (
+      {loading ? (
+        <div className="flex items-center justify-center gap-2 py-12 text-sm text-[var(--color-fg-muted)]">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          불러오는 중...
+        </div>
+      ) : portfolios.length > 0 ? (
         <>
           <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-fg-subtle)]">
-            내 포트폴리오 ({myPortfolios.length})
+            내 포트폴리오 ({portfolios.length})
           </p>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            {myPortfolios.map((pf) => (
+            {portfolios.map((pf) => (
               <PortfolioCard key={pf.id} portfolio={pf} />
             ))}
           </div>
         </>
-      )}
+      ) : null}
     </>
   )
 }
 
-function PortfolioCard({ portfolio }: { portfolio: (typeof myPortfolios)[number] }) {
-  const isPublished = portfolio.status === 'published'
+function PortfolioCard({ portfolio }: { portfolio: PortfolioSummary }) {
+  const isPublished = portfolio.status === 'PUBLISHED'
   return (
     <Link
       to={`/portfolio/${portfolio.id}`}
@@ -91,27 +109,43 @@ function PortfolioCard({ portfolio }: { portfolio: (typeof myPortfolios)[number]
             <p className="text-[15px] font-semibold tracking-tight text-[var(--color-fg)]">
               {portfolio.title}
             </p>
-            <p className="text-[11px] text-[var(--color-fg-muted)]">proofolio.io/{portfolio.slug}</p>
+            {portfolio.slug && (
+              <p className="text-[11px] text-[var(--color-fg-muted)]">proofolio.io/{portfolio.slug}</p>
+            )}
           </div>
         </div>
-        <Badge tone={isPublished ? 'success' : 'outline'}>{isPublished ? '공개' : '초안'}</Badge>
+        <Badge tone={isPublished ? 'success' : 'outline'}>
+          {isPublished ? '공개' : portfolio.status === 'READY' ? '완료' : '초안'}
+        </Badge>
       </div>
 
-      <p className="mt-3 px-5 text-sm text-[var(--color-fg-muted)]">{portfolio.description}</p>
+      {portfolio.description && (
+        <p className="mt-3 px-5 text-sm text-[var(--color-fg-muted)]">{portfolio.description}</p>
+      )}
 
       <div className="mt-4 flex items-center gap-4 px-5 text-xs text-[var(--color-fg-muted)]">
-        <span>
-          프로젝트 <span className="font-semibold text-[var(--color-fg)]">{portfolio.projectsCount}</span>
-        </span>
-        <span className="inline-flex items-center gap-1">
-          <Eye className="h-3.5 w-3.5" />
-          {portfolio.views.toLocaleString()}
-        </span>
-        <span className="ml-auto">업데이트 {portfolio.updatedAt}</span>
+        {portfolio.projectsCount != null && (
+          <span>
+            프로젝트 <span className="font-semibold text-[var(--color-fg)]">{portfolio.projectsCount}</span>
+          </span>
+        )}
+        {portfolio.views != null && (
+          <span className="inline-flex items-center gap-1">
+            <Eye className="h-3.5 w-3.5" />
+            {portfolio.views.toLocaleString()}
+          </span>
+        )}
+        {portfolio.updatedAt && (
+          <span className="ml-auto">업데이트 {portfolio.updatedAt}</span>
+        )}
       </div>
 
       <div className="mt-5 flex items-center justify-between border-t border-[var(--color-border)] px-5 py-3">
-        <Badge tone="neutral">{portfolio.theme}</Badge>
+        {portfolio.theme ? (
+          <Badge tone="neutral">{portfolio.theme}</Badge>
+        ) : (
+          <span />
+        )}
         <Button
           variant="outline"
           size="sm"

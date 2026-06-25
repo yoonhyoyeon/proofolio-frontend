@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, Check, FileText, Github, Sparkles } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, Github, Loader2, Sparkles } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -11,7 +11,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { WizardStepper } from '@/components/domain/WizardStepper'
 import { DropZone } from '@/components/domain/DropZone'
 import { ModeCard } from '@/components/domain/ModeCard'
-import { myPortfolios, positions } from '@/lib/mock'
+import { getPortfolioList, GITHUB_TOKEN_KEY, type PortfolioSummary } from '@/lib/api'
+import { positions } from '@/lib/mock'
 
 const STEPS = ['포트폴리오 선택', '직무 선택', '채용 공고', '면접 모드']
 
@@ -22,6 +23,17 @@ export function InterviewSetupPage() {
   const [position, setPosition] = useState('frontend')
   const navigate = useNavigate()
 
+  const [portfolios, setPortfolios] = useState<PortfolioSummary[]>([])
+  const [portfoliosLoading, setPortfoliosLoading] = useState(true)
+
+  useEffect(() => {
+    const token = localStorage.getItem(GITHUB_TOKEN_KEY) ?? ''
+    getPortfolioList(token)
+      .then(setPortfolios)
+      .catch(() => setPortfolios([]))
+      .finally(() => setPortfoliosLoading(false))
+  }, [])
+
   const togglePortfolio = (id: string) =>
     setSelectedPortfolios((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
@@ -31,7 +43,11 @@ export function InterviewSetupPage() {
 
   const next = () => setStep((s) => Math.min(STEPS.length - 1, s + 1))
   const prev = () => setStep((s) => Math.max(0, s - 1))
-  const start = () => navigate(`/interview/check?mode=${mode}`)
+  const start = () => {
+    const portfolioId = selectedPortfolios[0] ?? ''
+    const sessionNo = String(Math.floor(Math.random() * 1_000_000))
+    navigate(`/interview/check?mode=${mode}&portfolioId=${portfolioId}&sessionNo=${sessionNo}`)
+  }
 
   return (
     <>
@@ -51,65 +67,65 @@ export function InterviewSetupPage() {
               title="포트폴리오를 선택해 주세요"
               description="저장된 포트폴리오를 하나 이상 선택하면 AI 면접관이 내용을 분석해 맞춤 질문을 준비합니다."
             >
-              <div className="flex flex-col gap-3">
-                {myPortfolios.map((pf) => {
-                  const selected = selectedPortfolios.includes(pf.id)
-                  return (
-                    <button
-                      key={pf.id}
-                      type="button"
-                      onClick={() => togglePortfolio(pf.id)}
-                      className={
-                        'flex items-center gap-4 rounded-[var(--radius-md)] border p-4 text-left transition-colors ' +
-                        (selected
-                          ? 'border-[var(--color-brand)] bg-[var(--color-brand-subtle)]'
-                          : 'border-[var(--color-border)] bg-white hover:border-[var(--color-brand)]/40 hover:bg-[var(--color-surface)]')
-                      }
-                    >
-                      <span
+              {portfoliosLoading ? (
+                <div className="flex items-center justify-center gap-2 py-12 text-sm text-[var(--color-fg-muted)]">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  불러오는 중...
+                </div>
+              ) : portfolios.length === 0 ? (
+                <div className="flex flex-col items-center justify-center gap-3 py-12 text-sm text-[var(--color-fg-muted)]">
+                  <p>저장된 포트폴리오가 없습니다.</p>
+                  <Link to="/portfolio/new" className="text-[var(--color-brand)] hover:underline">
+                    포트폴리오 만들러 가기
+                  </Link>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {portfolios.map((pf) => {
+                    const selected = selectedPortfolios.includes(pf.id)
+                    return (
+                      <button
+                        key={pf.id}
+                        type="button"
+                        onClick={() => togglePortfolio(pf.id)}
                         className={
-                          'grid h-5 w-5 shrink-0 place-items-center rounded border transition-colors ' +
+                          'flex items-center gap-4 rounded-[var(--radius-md)] border p-4 text-left transition-colors ' +
                           (selected
-                            ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white'
-                            : 'border-[var(--color-border)] bg-white')
+                            ? 'border-[var(--color-brand)] bg-[var(--color-brand-subtle)]'
+                            : 'border-[var(--color-border)] bg-white hover:border-[var(--color-brand)]/40 hover:bg-[var(--color-surface)]')
                         }
                       >
-                        {selected && <Check className="h-3 w-3" />}
-                      </span>
-                      <span
-                        className={
-                          'grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-sm)] ' +
-                          (pf.source === 'github'
-                            ? 'bg-slate-900 text-white'
-                            : 'bg-[var(--color-brand-subtle)] text-[var(--color-brand)]')
-                        }
-                      >
-                        {pf.source === 'github' ? (
+                        <span
+                          className={
+                            'grid h-5 w-5 shrink-0 place-items-center rounded border transition-colors ' +
+                            (selected
+                              ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white'
+                              : 'border-[var(--color-border)] bg-white')
+                          }
+                        >
+                          {selected && <Check className="h-3 w-3" />}
+                        </span>
+                        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-sm)] bg-slate-900 text-white">
                           <Github className="h-4 w-4" />
-                        ) : (
-                          <FileText className="h-4 w-4" />
-                        )}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
+                        </span>
+                        <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-semibold text-[var(--color-fg)]">
                             {pf.title}
                           </p>
-                          <Badge tone={pf.source === 'github' ? 'neutral' : 'outline'} className="shrink-0">
-                            {pf.source === 'github' ? 'GitHub' : 'PDF'}
-                          </Badge>
+                          {pf.updatedAt && (
+                            <p className="mt-0.5 text-xs text-[var(--color-fg-muted)]">
+                              업데이트 {pf.updatedAt}
+                            </p>
+                          )}
                         </div>
-                        <p className="mt-0.5 truncate text-xs text-[var(--color-fg-muted)]">
-                          {pf.description}
-                        </p>
-                      </div>
-                      <span className="shrink-0 text-xs text-[var(--color-fg-subtle)]">
-                        {pf.updatedAt}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
+                        <Badge tone="outline" className="shrink-0">
+                          {pf.status === 'READY' ? '완료' : pf.status === 'PUBLISHED' ? '공개' : '초안'}
+                        </Badge>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
             </StepWrap>
           )}
 

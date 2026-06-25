@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import {
   Mic,
   MicOff,
@@ -26,9 +26,10 @@ import { RealtimeFeedbackPanel } from '@/components/domain/RealtimeFeedbackPanel
 import { LiveScoreGrid, type LiveScoreItem } from '@/components/domain/LiveScoreGrid'
 import { LiveWaveGraph } from '@/components/domain/LiveWaveGraph'
 import { interviewers, interviewMeta, currentUser } from '@/lib/mock'
+import { initInterviewSocket, getInterviewSocket, disconnectInterviewSocket, type InterviewInterviewer } from '@/lib/interviewSocket'
 import { useInterviewAudio, type ConnectionStatus } from '@/hooks/useInterviewAudio'
+import { submitAttitude, submitSpeechMetrics, getInterviewList, GITHUB_TOKEN_KEY } from '@/lib/api'
 import { useInterviewerTTS } from '@/hooks/useInterviewerTTS'
-import { useSpeechMetrics } from '@/hooks/useSpeechMetrics'
 import { useAudioAnalysis } from '@/hooks/useAudioAnalysis'
 import { postureFeedback, speechFeedbackFromAudio } from '@/lib/feedback'
 import { voiceFor } from '@/lib/tts'
@@ -43,15 +44,120 @@ export function InterviewRoomPage() {
   const mode: 'practice' | 'real' =
     params.get('mode') === 'real' ? 'real' : 'practice'
   const navigate = useNavigate()
+  const location = useLocation()
   const isReal = mode === 'real'
 
-  // Interviewers with random names matched to each voice's gender, stable for the session
-  const [panel] = useState(() =>
-    interviewers.map((it) => ({
+  // Data passed from device check page via location state
+  const locationState = location.state as {
+    questions?: InterviewQuestion[]
+    interviewers?: InterviewInterviewer[]
+    sessionId?: string
+    portfolioId?: string
+    sessionNo?: string | number
+  } | null
+  const sessionId = locationState?.sessionId ?? ''
+  const portfolioId = locationState?.portfolioId ?? ''
+  const sessionNo = String(locationState?.sessionNo ?? '')
+
+  // Attach listeners to the socket that was already connected in DeviceCheckPage.
+  // Do NOT call initInterviewSocket here — that would disconnect the live session.
+  useEffect(() => {
+    let socket: ReturnType<typeof getInterviewSocket>
+    try {
+      socket = getInterviewSocket()
+    } catch {
+      // Fallback: direct navigation to this page (no existing socket)
+      if (!sessionId) return
+      socket = initInterviewSocket({ sessionId })
+    }
+
+    const onAny = (eventName: string, ...args: unknown[]) => {
+      console.log(`[socket ↓ ${socket.id ?? '?'}] ${eventName}`, ...args)
+    }
+    socket.onAny(onAny)
+
+    const onEvent = (ev: { type: string; sessionId?: string }) => {
+      if (ev.type === 'session.ended') {
+        postSessionData()
+        disconnectInterviewSocket()
+        navigate('/reports')
+      }
+    }
+    socket.on('event', onEvent)
+
+    return () => {
+      socket.offAny(onAny)
+      socket.off('event', onEvent)
+    }
+  }, [sessionId, navigate])
+
+  const postSessionData = () => {
+    const token = localStorage.getItem(GITHUB_TOKEN_KEY) ?? ''
+    if (!token) return
+
+    const speechPayload = getSpeechMetricsPayload()
+    const attitudeMetrics = metricsRef.current
+
+    // Fetch full list and use the most recent session's id
+    getInterviewList(token)
+      .then((list) => {
+        if (list.length === 0) return
+        const latest = list.sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        )[0]
+        const id = latest.id
+        submitSpeechMetrics(id, speechPayload, token).catch(() => {})
+        if (attitudeMetrics) {
+          submitAttitude(
+            id,
+            {
+              eyeContact: Math.round(attitudeMetrics.gaze),
+              headDownCount: attitudeMetrics.headDownCount,
+              handMovementCount: attitudeMetrics.handRaiseCount,
+              postureStability: Math.round(attitudeMetrics.posture),
+            },
+            token,
+          ).catch(() => {})
+        }
+      })
+      .catch(() => {})
+  }
+
+  const handleExit = () => {
+    postSessionData()
+    try {
+      const socket = getInterviewSocket()
+      socket.emit('event', { type: 'session.end' })
+    } catch {
+      navigate('/reports')
+    }
+  }
+
+  const ACCENT_BY_KEY: Record<string, string> = {
+    kind: 'from-indigo-500 to-blue-500',
+    strict: 'from-pink-500 to-rose-500',
+    normal: 'from-amber-500 to-orange-500',
+  }
+
+  // Use real interviewers from session.started, fall back to mock
+  const [panel] = useState(() => {
+    const sessionInterviewers = locationState?.interviewers
+    if (sessionInterviewers && sessionInterviewers.length > 0) {
+      return sessionInterviewers
+        .sort((a, b) => a.order - b.order)
+        .map((it) => ({
+          id: it.interviewerKey,
+          name: it.displayName,
+          roleKo: it.personality,
+          initials: it.displayName.slice(0, 1) + (it.displayName[1] ?? ''),
+          accent: ACCENT_BY_KEY[it.interviewerKey] ?? 'from-slate-500 to-slate-700',
+        }))
+    }
+    return interviewers.map((it) => ({
       ...it,
       ...randomKoreanName(voiceFor(it.id).ssmlGender === 'FEMALE' ? 'FEMALE' : 'MALE'),
-    })),
-  )
+    }))
+  })
 
   // Speak interviewer questions aloud (Google Cloud TTS)
   const [ttsEnabled, setTtsEnabled] = useState(true)
@@ -90,11 +196,11 @@ export function InterviewRoomPage() {
   }, [])
   const elapsedLabel = `${String(Math.floor(elapsed / 60)).padStart(2, '0')}:${String(elapsed % 60).padStart(2, '0')}`
 
-  const { status, micOn, toggleMic, transcriptText } = useInterviewAudio()
+  const { status, micOn, toggleMic, transcriptText, speechMetrics, getSpeechMetricsPayload } = useInterviewAudio()
 
-  // Live vision metrics (client, immediate) + speech metrics (from backend)
+  // Live vision metrics (client, immediate)
   const [metrics, setMetrics] = useState<LiveMetrics | null>(null)
-  const { metrics: speech, feedback: speechFeedback } = useSpeechMetrics()
+  const metricsRef = useRef<LiveMetrics | null>(null)
   // Volume + intonation computed client-side via Web Audio (practice mode, mic on)
   const audio = useAudioAnalysis(!isReal && micOn)
 
@@ -107,17 +213,17 @@ export function InterviewRoomPage() {
     { label: '손 움직임', value: metrics ? metrics.handRaiseCount : null, color: 'amber', unit: '회' },
     { label: '자세 안정성', value: metrics ? Math.round(metrics.posture) : null, color: 'sky' },
     // 5–9: speech — 음량/억양은 아래 파형 그래프로 표시, 나머지는 백엔드
-    { label: '발화 속도', value: round(speech.speechRate), color: 'violet' },
+    { label: '발화 속도', value: round(speechMetrics.speechRate), color: 'violet', unit: '음절/분' },
     {
       label: '습관어',
-      value: speech.fillerCount,
+      value: speechMetrics.fillerCount,
       color: 'rose',
       unit: '회',
-      note: speech.fillerTypes.length ? speech.fillerTypes.join(', ') : undefined,
+      note: speechMetrics.fillerTypes.length ? speechMetrics.fillerTypes.join(', ') : undefined,
     },
     {
       label: '답변 지연',
-      value: speech.answerDelaySec === null ? null : Math.round(speech.answerDelaySec * 10) / 10,
+      value: speechMetrics.answerDelaySec === null ? null : Math.round(speechMetrics.answerDelaySec * 10) / 10,
       color: 'sky',
       unit: '초',
     },
@@ -130,7 +236,6 @@ export function InterviewRoomPage() {
       intonation: audio.intonation,
       volumeHistory: audio.volumeHistory,
     }),
-    ...speechFeedback,
   ]
 
   return (
@@ -142,7 +247,7 @@ export function InterviewRoomPage() {
         ttsEnabled={ttsEnabled}
         onToggleTts={() => setTtsEnabled(v => !v)}
         onTestQuestion={playTestQuestion}
-        onExit={() => navigate('/reports')}
+        onExit={handleExit}
       />
 
       <div className="flex flex-1 min-h-0">
@@ -182,7 +287,7 @@ export function InterviewRoomPage() {
               isReal={isReal}
               micOn={micOn}
               onToggleMic={toggleMic}
-              onMetrics={setMetrics}
+              onMetrics={(m) => { setMetrics(m); metricsRef.current = m }}
             />
           </section>
 
@@ -199,7 +304,7 @@ export function InterviewRoomPage() {
         {/* Right side bar — practice mode only */}
         {!isReal && (
           <aside className="hidden w-[340px] shrink-0 flex-col gap-5 overflow-y-auto border-l border-white/10 bg-white px-5 py-5 text-[var(--color-fg)] lg:flex">
-            <SidePanelSection
+<SidePanelSection
               title="실시간 피드백"
               badge={feedbackItems.length ? `${feedbackItems.length}` : undefined}
             >

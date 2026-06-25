@@ -28,11 +28,13 @@ import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Avatar } from '@/components/ui/avatar'
 import { WizardStepper } from '@/components/domain/WizardStepper'
-import { githubOssContributions, githubProfile } from '@/lib/mock'
+import { githubOssContributions } from '@/lib/mock'
 import {
   getGithubLoginUrl,
   getGithubRepos,
+  generatePortfolio,
   GITHUB_TOKEN_KEY,
+  GITHUB_USERNAME_KEY,
   type GithubRepo,
 } from '@/lib/api'
 
@@ -60,6 +62,7 @@ export function PortfolioBuilderPage() {
 
   // GitHub OAuth
   const [ghConnected, setGhConnected] = useState(false)
+  const [ghUsername, setGhUsername] = useState('')
   const [ghLoading, setGhLoading] = useState(false)
   const [ghError, setGhError] = useState('')
 
@@ -73,16 +76,32 @@ export function PortfolioBuilderPage() {
 
   // On mount: check if already connected (returned from OAuth callback)
   useEffect(() => {
-    const token = sessionStorage.getItem(GITHUB_TOKEN_KEY)
+    // hash fragment에서 토큰 파싱 (#sessionToken=...&username=...)
+    const hash = window.location.hash.slice(1)
+    if (hash) {
+      const params = new URLSearchParams(hash)
+      const sessionToken = params.get('sessionToken')
+      const username = params.get('username')
+      if (sessionToken) {
+        localStorage.setItem(GITHUB_TOKEN_KEY, sessionToken)
+        if (username) localStorage.setItem(GITHUB_USERNAME_KEY, username)
+        window.history.replaceState(null, '', window.location.pathname)
+      }
+    }
+
+    const token = localStorage.getItem(GITHUB_TOKEN_KEY)
     if (!token) return
     setGhConnected(true)
+    setGhUsername(localStorage.getItem(GITHUB_USERNAME_KEY) ?? '')
+    setStep(1)
     setReposLoading(true)
     getGithubRepos(token)
       .then(setRepos)
       .catch(() => {
-        // Token expired or invalid — clear and show connect again
-        sessionStorage.removeItem(GITHUB_TOKEN_KEY)
+        localStorage.removeItem(GITHUB_TOKEN_KEY)
+        localStorage.removeItem(GITHUB_USERNAME_KEY)
         setGhConnected(false)
+        setStep(0)
       })
       .finally(() => setReposLoading(false))
   }, [])
@@ -123,6 +142,39 @@ export function PortfolioBuilderPage() {
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     )
 
+  const [generating, setGenerating] = useState(false)
+  const [generateError, setGenerateError] = useState('')
+
+  const handleGenerate = async () => {
+    const token = localStorage.getItem(GITHUB_TOKEN_KEY)
+    if (!token) return
+    setGenerating(true)
+    setGenerateError('')
+    try {
+      const selectedRepoNames = repos
+        .filter((r) => selectedRepos.includes(r.id))
+        .map((r) => r.name)
+      const result = await generatePortfolio({
+        githubAccessToken: token,
+        selectedRepoNames,
+        homepage,
+        experiences: experiences
+          .filter((e) => e.company || e.role)
+          .map(({ company, role, period }) => ({ company, role, period })),
+        educations: educations
+          .filter((e) => e.school)
+          .map(({ school, period }) => ({ school, period })),
+        activities: activities
+          .filter((a) => a.title)
+          .map(({ title, description }) => ({ title, description })),
+      })
+      navigate(`/portfolio/${result.id}`, { replace: true })
+    } catch (err) {
+      setGenerateError(err instanceof Error ? err.message : '포트폴리오 생성에 실패했습니다.')
+      setGenerating(false)
+    }
+  }
+
   const canGoNext =
     (step === 0 && ghConnected) ||
     (step === 1 && selectedRepos.length > 0) ||
@@ -148,6 +200,7 @@ export function PortfolioBuilderPage() {
             >
               <GithubConnectPanel
                 connected={ghConnected}
+                username={ghUsername}
                 loading={ghLoading}
                 reposCount={repos.length}
                 reposLoading={reposLoading}
@@ -354,14 +407,29 @@ export function PortfolioBuilderPage() {
               <ArrowRight className="h-4 w-4" />
             </Button>
           ) : (
-            <Button
-              size="md"
-              onClick={() => navigate('/portfolio')}
-              className="gap-1"
-            >
-              <Sparkles className="h-4 w-4" />
-              포트폴리오 생성
-            </Button>
+            <div className="flex flex-col items-end gap-2">
+              {generateError && (
+                <p className="text-xs text-[var(--color-danger)]">{generateError}</p>
+              )}
+              <Button
+                size="md"
+                onClick={handleGenerate}
+                disabled={generating}
+                className="gap-1"
+              >
+                {generating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    생성 중...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4" />
+                    포트폴리오 생성
+                  </>
+                )}
+              </Button>
+            </div>
           )}
         </div>
       </Card>
@@ -402,6 +470,7 @@ function StepWrap({
 
 function GithubConnectPanel({
   connected,
+  username,
   loading,
   reposCount,
   reposLoading,
@@ -409,6 +478,7 @@ function GithubConnectPanel({
   onConnect,
 }: {
   connected: boolean
+  username: string
   loading: boolean
   reposCount: number
   reposLoading: boolean
@@ -427,7 +497,7 @@ function GithubConnectPanel({
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <p className="text-sm font-semibold text-[var(--color-fg)]">
-                @{githubProfile.username}
+                @{username}
               </p>
               <Badge tone="success" className="gap-1">
                 <Check className="h-3 w-3" />

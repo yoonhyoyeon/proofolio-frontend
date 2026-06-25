@@ -3,109 +3,816 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Panel Interview WebSocket Demo</title>
+    <title>면접 패널 웹소켓 데모</title>
     <style>
-      body {
-        font-family: system-ui, sans-serif;
-        margin: 24px;
-        line-height: 1.5;
+      :root {
+        --surface-primary: #f8fafc;
+        --surface-secondary: #ffffff;
+        --surface-elevated: #eef2f7;
+        --text-primary: #0f172a;
+        --text-secondary: #475569;
+        --text-tertiary: #64748b;
+        --border-default: #cbd5e1;
+        --border-subtle: #e2e8f0;
+        --accent-primary: #2563eb;
+        --accent-hover: #1d4ed8;
+        --status-success: #059669;
+        --status-warning: #d97706;
+        --status-error: #dc2626;
+        --status-info: #0ea5e9;
+        --interviewer-kind: #0f766e;
+        --interviewer-strict: #b42318;
+        --interviewer-normal: #334155;
+        --shadow-soft: 0 12px 32px rgba(15, 23, 42, 0.08);
+        --radius-lg: 18px;
+        --radius-md: 14px;
+        --radius-sm: 10px;
       }
 
-      label,
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family:
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
+        line-height: 1.6;
+        color: var(--text-primary);
+        background:
+          radial-gradient(
+            circle at top left,
+            rgba(37, 99, 235, 0.09),
+            transparent 38%
+          ),
+          radial-gradient(
+            circle at top right,
+            rgba(14, 165, 233, 0.1),
+            transparent 30%
+          ),
+          var(--surface-primary);
+      }
+
+      main {
+        width: min(960px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 32px 0 48px;
+        display: grid;
+        gap: 20px;
+      }
+
+      .hero {
+        display: grid;
+        gap: 14px;
+        padding: 24px;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), #ffffff);
+        border: 1px solid rgba(203, 213, 225, 0.9);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-soft);
+      }
+
+      .eyebrow {
+        margin: 0;
+        color: var(--accent-primary);
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: clamp(2rem, 4vw, 3rem);
+        line-height: 1.08;
+        letter-spacing: -0.03em;
+      }
+
+      .lead {
+        max-width: 72ch;
+        color: var(--text-secondary);
+        font-size: 16px;
+      }
+
+      .hero-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 16px;
+        align-items: start;
+      }
+
+      .status-card {
+        min-width: 240px;
+        padding: 16px;
+        border-radius: var(--radius-md);
+        background: var(--surface-secondary);
+        border: 1px solid var(--border-subtle);
+        display: grid;
+        gap: 8px;
+      }
+
+      .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        width: fit-content;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: rgba(5, 150, 105, 0.08);
+        color: var(--status-success);
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+      }
+
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: currentColor;
+      }
+
+      .status-copy {
+        color: var(--text-secondary);
+        font-size: 14px;
+      }
+
+      .section-card {
+        padding: 20px;
+        background: var(--surface-secondary);
+        border: 1px solid var(--border-default);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-soft);
+      }
+
+      .section-card__header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+
+      .section-title {
+        font-size: 20px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+
+      .section-subtitle {
+        margin-top: 4px;
+        color: var(--text-secondary);
+        font-size: 14px;
+      }
+
+      .form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .field {
+        display: grid;
+        gap: 8px;
+      }
+
+      .field--full {
+        grid-column: 1 / -1;
+      }
+
+      label {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-secondary);
+      }
+
+      input,
+      textarea,
       button {
-        display: block;
-        margin-top: 12px;
+        font: inherit;
       }
 
       input,
       textarea {
-        box-sizing: border-box;
         width: 100%;
-        max-width: 720px;
-        padding: 8px;
+        min-width: 0;
+        padding: 12px 14px;
+        border-radius: 12px;
+        border: 1px solid var(--border-default);
+        background: var(--surface-primary);
+        color: var(--text-primary);
+        outline: none;
+        transition:
+          border-color 140ms ease,
+          box-shadow 140ms ease,
+          transform 140ms ease;
+      }
+
+      input:focus,
+      textarea:focus {
+        border-color: rgba(37, 99, 235, 0.65);
+        box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
       }
 
       textarea {
-        min-height: 96px;
+        min-height: 112px;
+        resize: vertical;
+      }
+
+      .helper-note {
+        color: var(--text-secondary);
+        font-size: 13px;
+      }
+
+      .toggle-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 14px;
+        border: 1px solid var(--border-subtle);
+        border-radius: 12px;
+        background: var(--surface-primary);
+      }
+
+      .toggle-row input {
+        width: auto;
+        padding: 0;
+        box-shadow: none;
+      }
+
+      .button-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 6px;
       }
 
       button {
-        padding: 8px 12px;
+        appearance: none;
+        border: 0;
+        border-radius: 12px;
+        padding: 12px 16px;
+        font-weight: 700;
+        cursor: pointer;
+        transition:
+          transform 140ms ease,
+          background-color 140ms ease,
+          opacity 140ms ease;
+      }
+
+      button:hover:not(:disabled) {
+        transform: translateY(-1px);
+      }
+
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.55;
+      }
+
+      .button-primary {
+        background: var(--accent-primary);
+        color: white;
+      }
+
+      .button-primary:hover:not(:disabled) {
+        background: var(--accent-hover);
+      }
+
+      .button-secondary {
+        background: var(--surface-elevated);
+        color: var(--text-primary);
+      }
+
+      .button-ghost {
+        background: transparent;
+        border: 1px solid var(--border-default);
+        color: var(--text-primary);
+      }
+
+      .media-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 280px;
+        gap: 16px;
+        align-items: start;
       }
 
       video,
       canvas {
         display: block;
-        margin-top: 16px;
-        max-width: 360px;
         width: 100%;
-        background: #eee;
+        border-radius: 16px;
+        background: var(--surface-elevated);
+        border: 1px solid var(--border-subtle);
+      }
+
+      video {
+        aspect-ratio: 16 / 9;
+      }
+
+      canvas {
+        aspect-ratio: 16 / 9;
+      }
+
+      .meta-grid {
+        display: grid;
+        gap: 8px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .meta-card {
+        padding: 14px;
+        border-radius: 14px;
+        border: 1px solid var(--border-subtle);
+        background: var(--surface-primary);
+      }
+
+      .meta-label {
+        color: var(--text-tertiary);
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .meta-value {
+        margin-top: 6px;
+        font-size: 14px;
+        color: var(--text-primary);
+        word-break: break-word;
+      }
+
+      .question-list {
+        display: grid;
+        gap: 12px;
+      }
+
+      .question-card {
+        padding: 14px;
+        border-radius: 14px;
+        border: 1px solid var(--border-subtle);
+        background: var(--surface-primary);
+      }
+
+      .question-card__meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        margin-bottom: 10px;
+      }
+
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 3px 9px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+      }
+
+      .tag--category {
+        background: rgba(37, 99, 235, 0.08);
+        color: var(--accent-primary);
+      }
+
+      .tag--kind {
+        background: rgba(15, 118, 110, 0.08);
+        color: var(--interviewer-kind);
+      }
+
+      .tag--key {
+        background: rgba(100, 116, 139, 0.1);
+        color: var(--text-secondary);
+      }
+
+      .question-text {
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+
+      .question-rationale {
+        margin-top: 8px;
+        color: var(--text-secondary);
+        font-size: 14px;
+      }
+
+      .question-parent {
+        margin-top: 8px;
+        color: var(--text-tertiary);
+        font-size: 12px;
+      }
+
+      .evaluation-card {
+        display: grid;
+        gap: 14px;
+      }
+
+      .score-badge {
+        width: fit-content;
+        padding: 10px 14px;
+        border-radius: 14px;
+        background: rgba(14, 165, 233, 0.08);
+        color: var(--status-info);
+        font-size: 28px;
+        font-weight: 800;
+        letter-spacing: -0.04em;
+      }
+
+      .evaluation-feedback {
+        color: var(--text-secondary);
+        font-size: 14px;
+      }
+
+      .evaluation-followup {
+        padding: 12px 14px;
+        border-radius: 12px;
+        background: var(--surface-primary);
+        border: 1px solid var(--border-subtle);
+      }
+
+      .empty-state {
+        color: var(--text-tertiary);
+        font-size: 14px;
+      }
+
+      .event-stack {
+        display: grid;
+        gap: 12px;
+        max-height: 360px;
+        overflow: auto;
+        padding-right: 4px;
+      }
+
+      .panel-entry {
+        --entry-color: var(--interviewer-normal);
+        border-left: 4px solid var(--entry-color);
+        background: var(--surface-primary);
+        padding: 12px 12px 12px 14px;
+        border-radius: 12px;
+        box-shadow: inset 0 0 0 1px var(--border-subtle);
+      }
+
+      .panel-entry[data-interviewer='kind'] {
+        --entry-color: var(--interviewer-kind);
+      }
+
+      .panel-entry[data-interviewer='strict'] {
+        --entry-color: var(--interviewer-strict);
+      }
+
+      .panel-entry[data-interviewer='normal'] {
+        --entry-color: var(--interviewer-normal);
+      }
+
+      .panel-entry[data-event='panel.interrupt'] {
+        background: color-mix(
+          in srgb,
+          var(--status-error) 8%,
+          var(--surface-secondary)
+        );
+      }
+
+      .panel-entry__meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        margin-bottom: 8px;
+        font-size: 12px;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        color: var(--entry-color);
+      }
+
+      .panel-entry__badge {
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: color-mix(
+          in srgb,
+          var(--entry-color) 12%,
+          var(--surface-secondary)
+        );
+      }
+
+      .panel-entry__title {
+        font-weight: 700;
+        margin-bottom: 6px;
+      }
+
+      .panel-entry__reason {
+        margin-top: 8px;
+        color: var(--text-secondary);
+        font-size: 14px;
       }
 
       pre {
-        max-height: 360px;
+        margin: 0;
+        max-height: 320px;
         overflow: auto;
-        padding: 12px;
-        background: #f5f5f5;
+        padding: 14px;
+        background: var(--surface-primary);
+        border: 1px solid var(--border-subtle);
+        border-radius: 14px;
         white-space: pre-wrap;
+        word-break: break-word;
+        font-size: 13px;
+        color: var(--text-primary);
+      }
+
+      @media (max-width: 860px) {
+        .hero-row,
+        .media-grid,
+        .form-grid,
+        .meta-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .status-card {
+          min-width: 0;
+        }
       }
     </style>
   </head>
   <body>
     <main>
-      <h1>Panel Interview WebSocket Demo</h1>
+      <section class="hero">
+        <div class="hero-row">
+          <div>
+            <p class="eyebrow">실시간 면접 제어실</p>
+            <h1>면접 패널 웹소켓 데모</h1>
+            <p class="lead">
+              `portfolioId`와 `sessionNo`로 접속하면 소켓 연결 시점에 새
+              interview가 생성됩니다. 세션은 기술지식, 문제 해결력, 협업, 창의력
+              기준의 5개 질문으로 시작하며, 한 분야를 더 깊게 파는 질문이 하나
+              더 포함될 수 있습니다.
+            </p>
+          </div>
+          <aside class="status-card">
+            <div class="status-pill" id="connectionState">
+              <span class="status-dot"></span>
+              연결 끊김
+            </div>
+            <div class="status-copy" id="sessionSummary">
+              아직 시작된 면접이 없습니다.
+            </div>
+          </aside>
+        </div>
+      </section>
 
-      <label>
-        Backend URL
-        <input id="backendUrl" value="http://localhost:3000" />
-      </label>
+      <section class="section-card">
+        <div class="section-card__header">
+          <div>
+            <h2 class="section-title">연결</h2>
+            <p class="section-subtitle">
+              먼저 로그인하고 데모 포트폴리오를 만든 뒤 소켓에 연결합니다. `면접
+              ID`를 비워두면 `portfolioId + sessionNo` 조합으로 새 interview를
+              만들고 바로 시작합니다.
+            </p>
+          </div>
+        </div>
 
-      <label>
-        Session ID
-        <input id="sessionId" placeholder="InterviewSession id" />
-      </label>
+        <div class="form-grid">
+          <div class="field">
+            <label for="backendUrl">백엔드 URL</label>
+            <input id="backendUrl" value="http://localhost:3000" />
+          </div>
 
-      <label>
-        Portfolio ID
-        <input id="portfolioId" placeholder="Portfolio id" />
-      </label>
+          <div class="field">
+            <label for="username">사용자명</label>
+            <input id="username" value="demo" />
+          </div>
 
-      <label>
-        Session Token
-        <input id="token" placeholder="Bearer token value without the Bearer prefix" />
-      </label>
+          <div class="field">
+            <label for="token">세션 토큰</label>
+            <input id="token" placeholder="Bearer 접두사 없는 토큰 값" />
+          </div>
 
-      <button id="previewButton" type="button">Start camera and mic</button>
-      <button id="connectButton" type="button">Connect interview socket</button>
-      <button id="streamButton" type="button" disabled>Start streaming</button>
-      <button id="stopButton" type="button" disabled>Stop interview</button>
+          <div class="field">
+            <label for="portfolioId">포트폴리오 ID</label>
+            <input id="portfolioId" placeholder="포트폴리오 ID" />
+          </div>
 
-      <label>
-        Transcript text
-        <textarea
-          id="transcriptText"
-          placeholder="STT text or manual transcript for Anthropic panel decisions"
-        ></textarea>
-      </label>
+          <div class="field">
+            <label for="sessionNo">세션 번호</label>
+            <input id="sessionNo" type="number" min="0" value="1" />
+          </div>
 
-      <button id="sendDeltaButton" type="button" disabled>Send transcript.delta</button>
-      <button id="sendFinalButton" type="button" disabled>Send transcript.final</button>
+          <div class="field">
+            <label for="sessionId">면접 ID (선택, 기존 세션 연결용)</label>
+            <input
+              id="sessionId"
+              placeholder="비워두면 portfolioId + sessionNo로 새 면접 생성"
+            />
+          </div>
 
-      <video id="preview" autoplay muted playsinline></video>
-      <canvas id="frameCanvas" width="640" height="360"></canvas>
+          <div class="field field--full">
+            <label class="toggle-row" for="mediaEnabled">
+              <input id="mediaEnabled" type="checkbox" />
+              오디오와 카메라 프레임 전송
+            </label>
+            <p class="helper-note">
+              음성 전사는 백엔드의 Clova STT를 사용합니다. Anthropic 키는
+              질문 생성과 답변 평가에 필요합니다.
+            </p>
+          </div>
+        </div>
 
-      <h2>Transcript</h2>
-      <pre id="transcriptLog"></pre>
+        <div class="button-row">
+          <button id="initButton" class="button-secondary" type="button">
+            자동 초기화 (로그인 → 포트폴리오 → 소켓 연결)
+          </button>
+          <button id="previewButton" class="button-secondary" type="button">
+            카메라와 마이크 시작
+          </button>
+          <button id="connectButton" class="button-primary" type="button">
+            면접 소켓 연결
+          </button>
+          <button id="streamButton" class="button-ghost" type="button" disabled>
+            말하기 시작
+          </button>
+          <button id="speakEndButton" class="button-ghost" type="button" disabled>
+            말하기 종료
+          </button>
+          <button id="stopButton" class="button-ghost" type="button" disabled>
+            면접 종료
+          </button>
+        </div>
+      </section>
 
-      <h2>Panel</h2>
-      <pre id="panelLog"></pre>
+      <section class="section-card">
+        <div class="section-card__header">
+          <div>
+            <h2 class="section-title">전사 입력</h2>
+            <p class="section-subtitle">
+              실시간 STT 없이 패널 판단 흐름을 확인할 때 전사 이벤트를 직접 보낼
+              수 있습니다.
+            </p>
+          </div>
+        </div>
 
-      <h2>Events</h2>
-      <pre id="log"></pre>
+        <div class="form-grid">
+          <div class="field field--full">
+            <label for="transcriptText">전사 텍스트</label>
+            <textarea
+              id="transcriptText"
+              placeholder="STT 문장 또는 패널 판단용 전사 텍스트"
+            ></textarea>
+          </div>
+        </div>
+
+        <div class="button-row">
+          <button
+            id="sendDeltaButton"
+            class="button-secondary"
+            type="button"
+            disabled
+          >
+            전사 delta 전송
+          </button>
+          <button
+            id="sendFinalButton"
+            class="button-secondary"
+            type="button"
+            disabled
+          >
+            전사 final 전송
+          </button>
+        </div>
+      </section>
+
+      <section class="section-card">
+        <div class="section-card__header">
+          <div>
+            <h2 class="section-title">세션 상태</h2>
+            <p class="section-subtitle">
+              소켓이 연결되면 질문 5개가 미리 생성됩니다. 여기서 질문과 분류
+              메타데이터를 확인할 수 있습니다.
+            </p>
+          </div>
+        </div>
+
+        <div class="meta-grid">
+          <div class="meta-card">
+            <div class="meta-label">면접 ID</div>
+            <div class="meta-value" id="activeSessionId">-</div>
+          </div>
+          <div class="meta-card">
+            <div class="meta-label">질문 수</div>
+            <div class="meta-value" id="questionCount">0</div>
+          </div>
+        </div>
+
+        <div style="height: 14px"></div>
+
+        <div class="question-list" id="questionList">
+          <div class="empty-state">
+            세션이 시작되면 질문이 여기에 표시됩니다.
+          </div>
+        </div>
+      </section>
+
+      <section class="section-card">
+        <div class="section-card__header">
+          <div>
+            <h2 class="section-title">답변 평가</h2>
+            <p class="section-subtitle">
+              가장 최근 점수, 피드백, 생성된 꼬리질문을 보여줍니다.
+            </p>
+          </div>
+        </div>
+
+        <div id="evaluationPanel" class="evaluation-card">
+          <div class="empty-state">아직 평가된 답변이 없습니다.</div>
+        </div>
+      </section>
+
+      <section class="section-card">
+        <div class="section-card__header">
+          <div>
+            <h2 class="section-title">패널</h2>
+            <p class="section-subtitle">
+              면접 서비스에서 오는 실시간 패널 출력입니다.
+            </p>
+          </div>
+        </div>
+        <div id="panelLog" class="event-stack" aria-live="polite"></div>
+      </section>
+
+      <section class="section-card">
+        <div class="section-card__header">
+          <div>
+            <h2 class="section-title">전사 로그</h2>
+            <p class="section-subtitle">
+              가장 최근 전사 페이로드가 여기에 표시됩니다.
+            </p>
+          </div>
+        </div>
+        <pre id="transcriptLog"></pre>
+      </section>
+
+      <section class="section-card">
+        <div class="section-card__header">
+          <div>
+            <h2 class="section-title">미디어 미리보기</h2>
+            <p class="section-subtitle">카메라와 프레임 캡처 미리보기입니다.</p>
+          </div>
+        </div>
+        <div class="media-grid">
+          <video id="preview" autoplay muted playsinline></video>
+          <canvas id="frameCanvas" width="640" height="360"></canvas>
+        </div>
+      </section>
+
+      <section class="section-card">
+        <div class="section-card__header">
+          <div>
+            <h2 class="section-title">이벤트 로그</h2>
+            <p class="section-subtitle">
+              클라이언트와 서버 이벤트를 최신 순으로 보여줍니다.
+            </p>
+          </div>
+        </div>
+        <pre id="log"></pre>
+      </section>
     </main>
 
     <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
     <script>
+      const categoryLabels = {
+        TECHNICAL_KNOWLEDGE: '기술지식',
+        PROBLEM_SOLVING: '문제 해결력',
+        COLLABORATION: '협업',
+        CREATIVITY: '창의력',
+      };
+
+      const kindLabels = {
+        MAIN: '주질문',
+        FOLLOW_UP: '꼬리질문',
+      };
+
+      const transcriptLabels = {
+        'transcript.delta': '전사 중간',
+        'transcript.final': '전사 완료',
+      };
+
+      const panelEventLabels = {
+        'panel.message': '메시지',
+        'panel.interrupt': '중단',
+        'panel.evaluation': '평가',
+      };
+
       const state = {
         socket: null,
         mediaStream: null,
@@ -113,18 +820,46 @@
         audioSequence: 0,
         frameSequence: 0,
         frameTimer: null,
+        activeQuestions: [],
+      };
+
+      const logLabels = {
+        'init.login': '초기화.로그인',
+        'init.login.ok': '초기화.로그인완료',
+        'init.portfolio': '초기화.포트폴리오생성',
+        'init.portfolio.ok': '초기화.포트폴리오완료',
+        'init.error': '초기화.오류',
+        'preview.started': '미리보기.시작',
+        'socket.connected': '소켓.연결됨',
+        'socket.error': '소켓.오류',
+        'socket.disconnected': '소켓.연결끊김',
+        'server.event': '서버.이벤트',
+        'stream.started': '스트리밍.시작',
+        'stream.audio.recorder.started': '오디오.녹음시작',
+        'stream.audio.emitted': '오디오.전송',
+        'stream.frame.capture.started': '프레임.캡처시작',
+        'stream.frame.emitted': '프레임.전송',
+        'speaking.started': '발화.시작',
+        'speaking.ended': '발화.종료',
+        'interview.stopped': '면접.종료',
+        'client.error': '클라이언트.오류',
+        'answer.transcript': '답변.전사',
+        'answer.evaluation': '답변.평가',
       };
 
       const elements = {
         backendUrl: document.querySelector('#backendUrl'),
+        mediaEnabled: document.querySelector('#mediaEnabled'),
+        username: document.querySelector('#username'),
+        sessionNo: document.querySelector('#sessionNo'),
         sessionId: document.querySelector('#sessionId'),
         portfolioId: document.querySelector('#portfolioId'),
         token: document.querySelector('#token'),
-        preview: document.querySelector('#preview'),
-        frameCanvas: document.querySelector('#frameCanvas'),
+        initButton: document.querySelector('#initButton'),
         previewButton: document.querySelector('#previewButton'),
         connectButton: document.querySelector('#connectButton'),
         streamButton: document.querySelector('#streamButton'),
+        speakEndButton: document.querySelector('#speakEndButton'),
         stopButton: document.querySelector('#stopButton'),
         transcriptText: document.querySelector('#transcriptText'),
         sendDeltaButton: document.querySelector('#sendDeltaButton'),
@@ -132,26 +867,217 @@
         transcriptLog: document.querySelector('#transcriptLog'),
         panelLog: document.querySelector('#panelLog'),
         log: document.querySelector('#log'),
+        connectionState: document.querySelector('#connectionState'),
+        sessionSummary: document.querySelector('#sessionSummary'),
+        activeSessionId: document.querySelector('#activeSessionId'),
+        questionCount: document.querySelector('#questionCount'),
+        questionList: document.querySelector('#questionList'),
+        evaluationPanel: document.querySelector('#evaluationPanel'),
+        preview: document.querySelector('#preview'),
+        frameCanvas: document.querySelector('#frameCanvas'),
       };
 
       function logEvent(label, payload) {
-        const line = `[${new Date().toISOString()}] ${label} ${JSON.stringify(payload)}\n`;
+        const displayLabel = logLabels[label] ?? label;
+        const line = `[${new Date().toISOString()}] ${displayLabel} ${JSON.stringify(payload)}\n`;
         elements.log.textContent = line + elements.log.textContent;
       }
 
+      function setConnectionState(label, tone = 'success') {
+        elements.connectionState.innerHTML = '';
+        elements.connectionState.append(
+          createStatusDot(tone),
+          document.createTextNode(label),
+        );
+      }
+
+      function createStatusDot(tone) {
+        const dot = document.createElement('span');
+        dot.className = 'status-dot';
+        if (tone === 'success') {
+          dot.style.color = 'var(--status-success)';
+        } else if (tone === 'warning') {
+          dot.style.color = 'var(--status-warning)';
+        } else if (tone === 'error') {
+          dot.style.color = 'var(--status-error)';
+        } else {
+          dot.style.color = 'var(--status-info)';
+        }
+        return dot;
+      }
+
       function showTranscript(event) {
-        elements.transcriptLog.textContent = `[${event.type}]\n${event.transcript}`;
+        const label = transcriptLabels[event.type] ?? event.type;
+        const time = new Date().toLocaleTimeString();
+        const line = `[${time}] [${label}]\n${event.transcript}\n\n`;
+        elements.transcriptLog.textContent += line;
+        elements.transcriptLog.scrollTop = elements.transcriptLog.scrollHeight;
+      }
+
+      function renderSessionStarted(event) {
+        state.activeQuestions = event.questions;
+        elements.activeSessionId.textContent = event.sessionId;
+        elements.sessionSummary.textContent = `면접관 ${event.interviewers.length}명 준비 완료, 질문 ${event.questions.length}개가 미리 생성되었습니다.`;
+        elements.questionCount.textContent = String(event.questions.length);
+        elements.sessionId.value = event.sessionId;
+        setConnectionState('면접 준비 완료', 'success');
+
+        elements.questionList.replaceChildren(
+          ...event.questions.map((question, index) => {
+            const card = document.createElement('article');
+            card.className = 'question-card';
+
+            const meta = document.createElement('div');
+            meta.className = 'question-card__meta';
+
+            const orderTag = document.createElement('span');
+            orderTag.className = 'tag tag--key';
+            orderTag.textContent = `Q${index + 1}`;
+
+            const categoryTag = document.createElement('span');
+            categoryTag.className = 'tag tag--category';
+            categoryTag.textContent =
+              categoryLabels[question.category] ?? question.category;
+
+            const kindTag = document.createElement('span');
+            kindTag.className = 'tag tag--kind';
+            kindTag.textContent = kindLabels[question.kind] ?? question.kind;
+
+            const sortTag = document.createElement('span');
+            sortTag.className = 'tag tag--key';
+            sortTag.textContent = `정렬키=${question.sortKey}`;
+
+            meta.append(orderTag, categoryTag, kindTag, sortTag);
+
+            const title = document.createElement('div');
+            title.className = 'question-text';
+            title.textContent = question.question;
+
+            const rationale = document.createElement('div');
+            rationale.className = 'question-rationale';
+            rationale.textContent = question.rationale;
+
+            const parent = document.createElement('div');
+            parent.className = 'question-parent';
+            parent.textContent = question.parentQuestionId
+              ? `상위 질문: ${question.parentQuestionId}`
+              : '주질문';
+
+            card.append(meta, title, rationale, parent);
+            return card;
+          }),
+        );
+      }
+
+      function renderAnswerEvaluation(evaluation) {
+        const fragment = document.createDocumentFragment();
+
+        const score = document.createElement('div');
+        score.className = 'score-badge';
+        score.textContent = `${evaluation.score}`;
+
+        const feedback = document.createElement('div');
+        feedback.className = 'evaluation-feedback';
+        feedback.textContent = `피드백: ${evaluation.feedback}`;
+
+        const followUp = document.createElement('div');
+        followUp.className = 'evaluation-followup';
+        followUp.innerHTML = '<strong>꼬리질문</strong><div></div>';
+        followUp.querySelector('div').textContent = evaluation.followUpQuestion;
+
+        fragment.append(score, feedback, followUp);
+        elements.evaluationPanel.replaceChildren(fragment);
       }
 
       function showPanelEvent(event) {
-        const line = `[${event.type}] ${event.interviewerKey} priority=${event.priority}\n${event.message}\nreason: ${event.reason}\n\n`;
-        elements.panelLog.textContent = line + elements.panelLog.textContent;
+        const entry = document.createElement('section');
+        entry.className = 'panel-entry';
+        entry.dataset.interviewer = event.interviewerKey;
+        entry.dataset.event = event.type;
+
+        const meta = document.createElement('div');
+        meta.className = 'panel-entry__meta';
+
+        const badge = document.createElement('span');
+        badge.className = 'panel-entry__badge';
+        badge.textContent = event.interviewerKey;
+
+        const eventType = document.createElement('span');
+        eventType.textContent = panelEventLabels[event.type] ?? event.type;
+
+        const priority = document.createElement('span');
+        priority.textContent = `우선순위=${event.priority}`;
+
+        meta.append(badge, eventType, priority);
+
+        const title = document.createElement('div');
+        title.className = 'panel-entry__title';
+        title.textContent = event.message;
+
+        const reason = document.createElement('div');
+        reason.className = 'panel-entry__reason';
+        reason.textContent = `사유: ${event.reason}`;
+
+        entry.append(meta, title, reason);
+        elements.panelLog.prepend(entry);
+      }
+
+      async function autoInit() {
+        const backendUrl = requiredValue(elements.backendUrl, '백엔드 URL');
+        const username = elements.username.value.trim() || 'demo';
+        const sessionNoValue = String(Math.floor(Math.random() * 1_000_000));
+        elements.initButton.disabled = true;
+        elements.initButton.textContent = '초기화 중...';
+        try {
+          logEvent('init.login', { username });
+          const loginRes = await fetch(`${backendUrl}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username }),
+          });
+          if (!loginRes.ok) throw new Error(`로그인 실패: ${loginRes.status}`);
+          const { sessionToken } = await loginRes.json();
+          elements.token.value = sessionToken;
+          logEvent('init.login.ok', {
+            sessionToken: sessionToken.slice(0, 20) + '...',
+          });
+
+          logEvent('init.portfolio', {});
+          const portfolioRes = await fetch(`${backendUrl}/demo/portfolio`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${sessionToken}`,
+            },
+            body: JSON.stringify({}),
+          });
+          if (!portfolioRes.ok) {
+            throw new Error(`포트폴리오 생성 실패: ${portfolioRes.status}`);
+          }
+          const { portfolioId } = await portfolioRes.json();
+          elements.portfolioId.value = portfolioId;
+          elements.sessionNo.value = sessionNoValue;
+          elements.sessionId.value = '';
+          elements.sessionSummary.textContent =
+            '포트폴리오 준비 완료. 소켓 연결 시 새 면접이 생성됩니다.';
+          setConnectionState('연결 대기 중', 'info');
+          logEvent('init.portfolio.ok', { portfolioId });
+
+          connectSocket();
+          elements.initButton.textContent = '초기화 완료';
+          elements.initButton.disabled = false;
+        } catch (error) {
+          logEvent('init.error', { message: error.message });
+          elements.initButton.textContent = '초기화 실패 (재시도)';
+          elements.initButton.disabled = false;
+          setConnectionState('초기화 실패', 'error');
+        }
       }
 
       function requiredValue(input, name) {
         const value = input.value.trim();
         if (!value) {
-          throw new Error(`${name} is required`);
+          throw new Error(`${name}은(는) 필수입니다`);
         }
         return value;
       }
@@ -179,21 +1105,39 @@
       }
 
       function connectSocket() {
-        const backendUrl = requiredValue(elements.backendUrl, 'Backend URL');
-        const sessionId = requiredValue(elements.sessionId, 'Session ID');
-        const portfolioId = requiredValue(elements.portfolioId, 'Portfolio ID');
-        const token = requiredValue(elements.token, 'Session Token');
+        if (state.socket) {
+          state.socket.disconnect();
+          state.socket = null;
+        }
+
+        const backendUrl = requiredValue(elements.backendUrl, '백엔드 URL');
+        const portfolioId = requiredValue(
+          elements.portfolioId,
+          '포트폴리오 ID',
+        );
+        const token = requiredValue(elements.token, '세션 토큰');
+        const sessionId = elements.sessionId.value.trim();
+        const sessionNo = elements.sessionNo.value.trim();
+        const query =
+          sessionId.length > 0
+            ? { sessionId }
+            : {
+                portfolioId,
+                sessionNo: requiredValue(elements.sessionNo, '세션 번호'),
+              };
 
         state.socket = io(`${backendUrl}/interviews`, {
           auth: { token },
-          query: { sessionId },
+          query,
           transports: ['websocket'],
         });
 
         state.socket.on('connect', () => {
-          logEvent('socket.connected', { socketId: state.socket.id });
+          setConnectionState('소켓 연결됨', 'success');
+          logEvent('socket.connected', { socketId: state.socket.id, query });
           state.socket.emit('event', { type: 'session.start', portfolioId });
           elements.streamButton.disabled = false;
+          elements.speakEndButton.disabled = true;
           elements.stopButton.disabled = false;
           elements.sendDeltaButton.disabled = false;
           elements.sendFinalButton.disabled = false;
@@ -201,8 +1145,20 @@
 
         state.socket.on('event', (event) => {
           logEvent('server.event', event);
-          if (event.type === 'transcript.delta' || event.type === 'transcript.final') {
+          if (
+            event.type === 'transcript.delta' ||
+            event.type === 'transcript.final'
+          ) {
             showTranscript(event);
+          }
+          if (event.type === 'session.started') {
+            renderSessionStarted(event);
+          }
+          if (event.type === 'answer.transcript') {
+            showTranscript({ type: 'answer.transcript', transcript: event.transcript });
+          }
+          if (event.type === 'answer.evaluation') {
+            renderAnswerEvaluation(event.evaluation);
           }
           if (
             event.type === 'panel.message' ||
@@ -214,59 +1170,109 @@
           if (event.type === 'panel.interrupt') {
             stopAudioRecorder();
           }
+          if (event.type === 'panel.error') {
+            setConnectionState('패널 오류', 'error');
+          }
+          if (event.type === 'session.ended') {
+            setConnectionState('면접 종료됨', 'warning');
+          }
         });
 
         state.socket.on('connect_error', (error) => {
           logEvent('socket.error', { message: error.message });
+          setConnectionState('소켓 오류', 'error');
         });
 
         state.socket.on('disconnect', (reason) => {
           logEvent('socket.disconnected', { reason });
-          stopStreaming();
+          stopAudioRecorder();
+          if (state.frameTimer) {
+            clearInterval(state.frameTimer);
+            state.frameTimer = null;
+          }
+          elements.streamButton.disabled = true;
+          elements.speakEndButton.disabled = true;
+          setConnectionState('연결 끊김', 'warning');
         });
       }
 
       function startStreaming() {
         if (!state.socket?.connected) {
-          throw new Error('Socket is not connected');
+          throw new Error('소켓이 연결되지 않았습니다');
         }
-        if (!state.mediaStream) {
-          throw new Error('Camera and mic preview is not started');
+        if (elements.mediaEnabled.checked && !state.mediaStream) {
+          throw new Error('카메라와 마이크 미리보기가 시작되지 않았습니다');
         }
 
         state.socket.emit('event', { type: 'user.speaking.start' });
-        startAudioRecorder();
-        startFrameCapture();
+        if (elements.mediaEnabled.checked) {
+          startAudioRecorder();
+          startFrameCapture();
+        }
         elements.streamButton.disabled = true;
-        logEvent('stream.started', {});
+        elements.speakEndButton.disabled = false;
+        logEvent('speaking.started', { mediaEnabled: elements.mediaEnabled.checked });
+      }
+
+      function stopSpeaking() {
+        if (!state.socket?.connected) {
+          throw new Error('소켓이 연결되지 않았습니다');
+        }
+        stopAudioRecorder();
+        if (state.frameTimer) {
+          clearInterval(state.frameTimer);
+          state.frameTimer = null;
+        }
+        state.socket.emit('event', { type: 'user.speaking.end' });
+        elements.streamButton.disabled = false;
+        elements.speakEndButton.disabled = true;
+        logEvent('speaking.ended', {});
       }
 
       function sendTranscript(type) {
         if (!state.socket?.connected) {
-          throw new Error('Socket is not connected');
+          throw new Error('소켓이 연결되지 않았습니다');
         }
-        const transcript = requiredValue(elements.transcriptText, 'Transcript text');
+        const transcript = requiredValue(
+          elements.transcriptText,
+          '전사 텍스트',
+        );
         state.socket.emit('event', { type, transcript });
         logEvent('client.event', { type, transcript });
       }
 
       function startAudioRecorder() {
-        state.mediaRecorder = new MediaRecorder(state.mediaStream, {
+        const audioStream = new MediaStream(state.mediaStream.getAudioTracks());
+        if (audioStream.getAudioTracks().length === 0) {
+          throw new Error('오디오 트랙이 없습니다');
+        }
+
+        const mediaRecorder = new MediaRecorder(audioStream, {
           mimeType: preferredAudioMimeType(),
         });
-        state.mediaRecorder.ondataavailable = async (event) => {
+        mediaRecorder.ondataavailable = async (event) => {
           if (event.data.size === 0 || !state.socket?.connected) {
             return;
           }
-          state.socket.emit('event', {
+          const payload = {
             type: 'media.audio',
             sequence: state.audioSequence,
             mimeType: event.data.type || 'audio/webm',
             dataBase64: await blobToBase64(event.data),
+          };
+          state.socket.emit('event', payload);
+          logEvent('stream.audio.emitted', {
+            sequence: payload.sequence,
+            mimeType: payload.mimeType,
+            byteLength: event.data.size,
           });
           state.audioSequence += 1;
         };
-        state.mediaRecorder.start(1000);
+        mediaRecorder.start(1000);
+        state.mediaRecorder = mediaRecorder;
+        logEvent('stream.audio.recorder.started', {
+          mimeType: mediaRecorder.mimeType,
+        });
       }
 
       function startFrameCapture() {
@@ -286,15 +1292,22 @@
             if (!blob || !state.socket?.connected) {
               return;
             }
-            state.socket.emit('event', {
+            const payload = {
               type: 'media.frame',
               sequence: state.frameSequence,
               mimeType: 'image/jpeg',
               dataBase64: await blobToBase64(blob),
+            };
+            state.socket.emit('event', payload);
+            logEvent('stream.frame.emitted', {
+              sequence: payload.sequence,
+              mimeType: payload.mimeType,
+              byteLength: blob.size,
             });
             state.frameSequence += 1;
           }, 'image/jpeg');
         }, 1000);
+        logEvent('stream.frame.capture.started', {});
       }
 
       function preferredAudioMimeType() {
@@ -311,19 +1324,11 @@
         state.mediaRecorder = null;
       }
 
-      function stopStreaming() {
-        stopAudioRecorder();
-        if (state.frameTimer) {
-          clearInterval(state.frameTimer);
-          state.frameTimer = null;
-        }
-        elements.streamButton.disabled = !state.socket?.connected;
-      }
-
       function stopInterview() {
-        stopStreaming();
+        if (!elements.speakEndButton.disabled) {
+          stopSpeaking();
+        }
         if (state.socket?.connected) {
-          state.socket.emit('event', { type: 'user.speaking.end' });
           state.socket.emit('event', { type: 'session.end' });
           state.socket.disconnect();
         }
@@ -333,6 +1338,7 @@
         state.mediaStream = null;
         elements.stopButton.disabled = true;
         elements.streamButton.disabled = true;
+        elements.speakEndButton.disabled = true;
         elements.sendDeltaButton.disabled = true;
         elements.sendFinalButton.disabled = true;
         logEvent('interview.stopped', {});
@@ -344,13 +1350,16 @@
             .then(action)
             .catch((error) => {
               logEvent('client.error', { message: error.message });
+              setConnectionState('클라이언트 오류', 'error');
             });
         });
       }
 
+      bind(elements.initButton, autoInit);
       bind(elements.previewButton, startPreview);
       bind(elements.connectButton, connectSocket);
       bind(elements.streamButton, startStreaming);
+      bind(elements.speakEndButton, stopSpeaking);
       bind(elements.stopButton, stopInterview);
       bind(elements.sendDeltaButton, () => sendTranscript('transcript.delta'));
       bind(elements.sendFinalButton, () => sendTranscript('transcript.final'));

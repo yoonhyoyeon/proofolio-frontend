@@ -25,6 +25,10 @@ export const INTERVIEWER_VOICES: Record<string, TtsVoice> = {
   'sr-eng': { languageCode: 'ko-KR', name: 'ko-KR-Neural2-C', ssmlGender: 'MALE' },
   hr: { languageCode: 'ko-KR', name: 'ko-KR-Neural2-A', ssmlGender: 'FEMALE' },
   cto: { languageCode: 'ko-KR', name: 'ko-KR-Wavenet-D', ssmlGender: 'MALE' },
+  // socket interviewerKey aliases
+  kind: { languageCode: 'ko-KR', name: 'ko-KR-Neural2-C', ssmlGender: 'MALE' },
+  strict: { languageCode: 'ko-KR', name: 'ko-KR-Neural2-A', ssmlGender: 'FEMALE' },
+  normal: { languageCode: 'ko-KR', name: 'ko-KR-Wavenet-D', ssmlGender: 'MALE' },
 }
 
 export function voiceFor(interviewerKey?: string): TtsVoice {

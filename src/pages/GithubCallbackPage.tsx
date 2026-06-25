@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Github, Loader2, AlertCircle } from 'lucide-react'
-import { exchangeGithubCode, GITHUB_TOKEN_KEY } from '@/lib/api'
+import { exchangeGithubCode, SESSION_TOKEN_KEY, GITHUB_USERNAME_KEY } from '@/lib/api'
 import { useState } from 'react'
 
 type Status = 'loading' | 'error'
@@ -17,6 +17,16 @@ export function GithubCallbackPage() {
     if (called.current) return
     called.current = true
 
+    // 백엔드가 토큰을 직접 redirect param으로 전달하는 경우
+    const sessionToken = searchParams.get('sessionToken')
+    const username = searchParams.get('username')
+    if (sessionToken) {
+      localStorage.setItem(SESSION_TOKEN_KEY, sessionToken)
+      if (username) localStorage.setItem(GITHUB_USERNAME_KEY, username)
+      navigate('/portfolio/new', { replace: true })
+      return
+    }
+
     const code = searchParams.get('code')
     const state = searchParams.get('state')
 
@@ -28,7 +38,8 @@ export function GithubCallbackPage() {
 
     exchangeGithubCode(code, state)
       .then((data) => {
-        sessionStorage.setItem(GITHUB_TOKEN_KEY, data.access_token)
+        localStorage.setItem(SESSION_TOKEN_KEY, data.sessionToken)
+        localStorage.setItem(GITHUB_USERNAME_KEY, data.username)
         navigate('/portfolio/new', { replace: true })
       })
       .catch((err: unknown) => {
