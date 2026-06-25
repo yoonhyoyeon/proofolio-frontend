@@ -1,7 +1,8 @@
 import { io, type Socket } from 'socket.io-client'
 import { GITHUB_TOKEN_KEY } from '@/lib/api'
 
-const BACKEND_URL = 'http://43.202.227.251:3000'
+// Dev: direct to backend / Prod: same-origin so Vercel rewrites /socket.io/* → backend
+const BACKEND_URL = import.meta.env.DEV ? 'http://43.202.227.251:3000' : ''
 
 export type InterviewQuestion = {
   id: string
@@ -75,7 +76,7 @@ export function initInterviewSocket(options: NewSessionOptions | ExistingSession
   const sock = io(`${BACKEND_URL}/interviews`, {
     auth: { token },
     query,
-    transports: ['websocket'],
+    transports: ['polling', 'websocket'],
     forceNew: false,
   })
 

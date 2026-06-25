@@ -106,16 +106,20 @@ export function PortfolioBuilderPage() {
       .finally(() => setReposLoading(false))
   }, [])
 
-  // Step 2 inputs (4, 7, 9, 10)
-  const [homepage, setHomepage] = useState('')
+  // Step 2 inputs — pre-filled with demo data for quick showcase
+  const [homepage, setHomepage] = useState('https://yhy.dev')
   const [experiences, setExperiences] = useState<Experience[]>([
-    { id: newId(), company: '', role: '', period: '' },
+    { id: newId(), company: '토스', role: '프론트엔드 개발자', period: '2024.03 ~ 현재' },
+    { id: newId(), company: '카카오엔터프라이즈', role: '프론트엔드 개발자', period: '2022.07 ~ 2024.02' },
+    { id: newId(), company: '넥스트스텝', role: '프론트엔드 인턴', period: '2022.01 ~ 2022.06' },
   ])
   const [educations, setEducations] = useState<Education[]>([
-    { id: newId(), school: '', period: '' },
+    { id: newId(), school: '한국대학교 컴퓨터공학과', period: '2018.03 ~ 2022.02' },
   ])
   const [activities, setActivities] = useState<Activity[]>([
-    { id: newId(), title: '', description: '' },
+    { id: newId(), title: '2025 FEConf 발표 — "MediaPipe로 만드는 실시간 AI 코칭"', description: '600명 이상 참석. 브라우저 내 실시간 ML 추론 패턴 공유.' },
+    { id: newId(), title: 'React 공식 문서 한국어 번역 기여', description: 'useEffect, useMemo 섹션 번역 및 리뷰 참여.' },
+    { id: newId(), title: '기술 블로그 운영', description: 'https://yhy.dev/blog — 월 평균 8,000 PV, 구독자 1,200명.' },
   ])
 
   const filteredRepos = repos.filter((r) =>

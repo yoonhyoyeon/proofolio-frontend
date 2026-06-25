@@ -1,4 +1,4 @@
-const BASE_URL = 'http://43.202.227.251:3000'
+const BASE_URL = '/api'
 
 export async function getGithubLoginUrl(): Promise<{ url: string; state: string }> {
   const res = await fetch(`${BASE_URL}/github/login`)
